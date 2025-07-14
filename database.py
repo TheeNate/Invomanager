@@ -193,6 +193,30 @@ class DatabaseManager:
         finally:
             conn.close()
     
+    def delete_equipment(self, equipment_id: str) -> bool:
+        """Delete equipment entry (only if no inspections exist)"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Check if equipment has inspections
+            cursor.execute("SELECT COUNT(*) FROM Inspections WHERE equipment_id = ?", (equipment_id,))
+            inspection_count = cursor.fetchone()[0]
+            
+            if inspection_count > 0:
+                return False  # Cannot delete equipment with inspections
+            
+            # Delete status changes first (foreign key constraint)
+            cursor.execute("DELETE FROM Status_Changes WHERE equipment_id = ?", (equipment_id,))
+            
+            # Delete equipment
+            cursor.execute("DELETE FROM Equipment WHERE equipment_id = ?", (equipment_id,))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+    
     def get_equipment_by_id(self, equipment_id: str) -> Optional[Dict]:
         """Get equipment details by ID"""
         conn = self.connect()

@@ -116,10 +116,18 @@
                         </div>
                     {% endif %}
                     
-                    <button type="submit" class="btn btn-warning" 
-                            onclick="return confirm('Are you sure you want to change the equipment status?')">
-                        <i class="bi bi-arrow-repeat"></i> Update Status
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-warning" 
+                                onclick="return confirm('Are you sure you want to change the equipment status?')">
+                            <i class="bi bi-arrow-repeat"></i> Update Status
+                        </button>
+                        
+                        {% if not inspections %}
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="bi bi-trash"></i> Delete Equipment
+                            </button>
+                        {% endif %}
+                    </div>
                 </form>
             </div>
         </div>
@@ -202,4 +210,53 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+{% if not inspections %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i> Delete Equipment
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">
+                    <strong>Are you sure you want to permanently delete equipment {{ equipment.equipment_id }}?</strong>
+                </p>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The equipment record will be permanently removed from the system.
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Note:</strong> Equipment with inspection history cannot be deleted. Use "DESTROYED" status instead to maintain compliance records.
+                </div>
+                
+                <p class="text-muted">
+                    Equipment Details:
+                    <br><strong>Type:</strong> {{ equipment.equipment_type }} - {{ equipment.type_description }}
+                    {% if equipment.serial_number %}
+                        <br><strong>Serial:</strong> {{ equipment.serial_number }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <form method="POST" action="{{ url_for('delete_equipment', equipment_id=equipment.equipment_id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

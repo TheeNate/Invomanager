@@ -157,6 +157,36 @@ def update_equipment_status(equipment_id):
         flash(f'Error updating equipment status: {str(e)}', 'error')
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
+@app.route('/equipment/<equipment_id>/delete', methods=['POST'])
+def delete_equipment(equipment_id):
+    """Delete equipment entry"""
+    try:
+        # Check if equipment exists
+        equipment = db_manager.get_equipment_by_id(equipment_id)
+        if not equipment:
+            flash('Equipment not found', 'error')
+            return redirect(url_for('index'))
+        
+        # Safety check - only allow deletion of equipment without inspections
+        inspections = db_manager.get_equipment_inspections(equipment_id)
+        if inspections:
+            flash('Cannot delete equipment with inspection history. Set status to DESTROYED instead.', 'warning')
+            return redirect(url_for('equipment_details', equipment_id=equipment_id))
+        
+        # Delete the equipment
+        success = db_manager.delete_equipment(equipment_id)
+        
+        if success:
+            flash(f'Equipment {equipment_id} has been permanently deleted', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Failed to delete equipment', 'error')
+            return redirect(url_for('equipment_details', equipment_id=equipment_id))
+    
+    except Exception as e:
+        flash(f'Error deleting equipment: {str(e)}', 'error')
+        return redirect(url_for('equipment_details', equipment_id=equipment_id))
+
 @app.route('/inspection/add', methods=['GET', 'POST'])
 @app.route('/inspection/add/<equipment_id>', methods=['GET', 'POST'])
 def add_inspection(equipment_id=None):

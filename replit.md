@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a desktop equipment inventory management system specifically designed for safety/climbing equipment. The application provides comprehensive tracking of equipment with unique IDs, mandatory inspection cycles, status management, and compliance with safety regulations including 7-year record retention requirements.
+This is a web-based equipment inventory management system specifically designed for safety/climbing equipment. The application provides comprehensive tracking of equipment with unique IDs, mandatory inspection cycles, status management, and compliance with safety regulations including 7-year record retention requirements. Users can manage equipment lifecycle from creation to disposal with full audit trails.
 
 ## User Preferences
 
@@ -11,10 +11,10 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-- **Framework**: Tkinter (Python's built-in GUI library)
-- **Pattern**: Traditional desktop application with multiple windows
-- **Structure**: Main window with modal dialogs for forms and reports
-- **Components**: Modular UI components in separate files for maintainability
+- **Framework**: Flask web application with Bootstrap 5 UI framework
+- **Pattern**: Server-side rendered web pages with responsive design
+- **Structure**: Base template with extending pages for forms and reports
+- **Components**: Modular HTML templates with JavaScript enhancements for interactivity
 
 ### Backend Architecture
 - **Language**: Python 3

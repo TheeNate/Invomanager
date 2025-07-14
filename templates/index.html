@@ -138,6 +138,13 @@
                                                 <i class="bi bi-clipboard-check"></i>
                                             </a>
                                         {% endif %}
+                                        {% if not equipment.last_inspection %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                    onclick="deleteEquipment('{{ equipment.equipment_id }}')" 
+                                                    title="Delete Equipment">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -160,4 +167,53 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteEquipmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i> Delete Equipment
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">
+                    <strong>Are you sure you want to permanently delete equipment <span id="deleteEquipmentId"></span>?</strong>
+                </p>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The equipment record will be permanently removed.
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Note:</strong> Only equipment without inspection history can be deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <form id="deleteEquipmentForm" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteEquipment(equipmentId) {
+    document.getElementById('deleteEquipmentId').textContent = equipmentId;
+    document.getElementById('deleteEquipmentForm').action = '/equipment/' + equipmentId + '/delete';
+    new bootstrap.Modal(document.getElementById('deleteEquipmentModal')).show();
+}
+</script>
 {% endblock %}
