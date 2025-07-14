@@ -86,33 +86,85 @@ def add_equipment():
     """Add new equipment"""
     if request.method == 'POST':
         try:
-            # Get form data
+            # Check if this is batch mode
+            batch_mode = request.form.get('batch_mode') == 'true'
+            
+            # Get common form data
             equipment_type = request.form.get('equipment_type')
             name = request.form.get('name', '').strip() or None
-            serial_number = request.form.get('serial_number', '').strip() or None
             purchase_date = parse_date(request.form.get('purchase_date', '').strip())
             first_use_date = parse_date(request.form.get('first_use_date', '').strip())
             
-            # Validate form
-            errors = FormValidator.validate_equipment_form(
-                equipment_type, serial_number or '', purchase_date, first_use_date
-            )
+            if batch_mode:
+                # Handle batch equipment creation
+                batch_quantity = int(request.form.get('batch_quantity', 0))
+                
+                if batch_quantity < 2 or batch_quantity > 50:
+                    flash('Batch quantity must be between 2 and 50.', 'error')
+                    equipment_types = db_manager.get_equipment_types()
+                    return render_template('add_equipment.html', 
+                                         equipment_types=equipment_types,
+                                         form_data=request.form)
+                
+                # Validate common fields
+                if not equipment_type:
+                    flash('Equipment type is required.', 'error')
+                    equipment_types = db_manager.get_equipment_types()
+                    return render_template('add_equipment.html', 
+                                         equipment_types=equipment_types,
+                                         form_data=request.form)
+                
+                # Create equipment for each serial number
+                created_equipment = []
+                for i in range(1, batch_quantity + 1):
+                    serial_number = request.form.get(f'batch_serial_{i}', '').strip() or None
+                    
+                    # Validate each item
+                    errors = FormValidator.validate_equipment_form(
+                        equipment_type, serial_number or '', purchase_date, first_use_date
+                    )
+                    
+                    if errors:
+                        for error in errors:
+                            flash(f'Item #{i}: {error}', 'error')
+                        equipment_types = db_manager.get_equipment_types()
+                        return render_template('add_equipment.html', 
+                                             equipment_types=equipment_types,
+                                             form_data=request.form)
+                    
+                    # Add individual equipment
+                    equipment_id = db_manager.add_equipment(
+                        equipment_type, name, serial_number, purchase_date, first_use_date
+                    )
+                    created_equipment.append(equipment_id)
+                
+                flash(f'Successfully added {len(created_equipment)} pieces of equipment: {", ".join(created_equipment)}', 'success')
+                return redirect(url_for('index'))
             
-            if errors:
-                for error in errors:
-                    flash(error, 'error')
-                equipment_types = db_manager.get_equipment_types()
-                return render_template('add_equipment.html', 
-                                     equipment_types=equipment_types,
-                                     form_data=request.form)
-            
-            # Add equipment
-            equipment_id = db_manager.add_equipment(
-                equipment_type, name, serial_number, purchase_date, first_use_date
-            )
-            
-            flash(f'Equipment {equipment_id} added successfully!', 'success')
-            return redirect(url_for('index'))
+            else:
+                # Handle single equipment creation
+                serial_number = request.form.get('serial_number', '').strip() or None
+                
+                # Validate form
+                errors = FormValidator.validate_equipment_form(
+                    equipment_type, serial_number or '', purchase_date, first_use_date
+                )
+                
+                if errors:
+                    for error in errors:
+                        flash(error, 'error')
+                    equipment_types = db_manager.get_equipment_types()
+                    return render_template('add_equipment.html', 
+                                         equipment_types=equipment_types,
+                                         form_data=request.form)
+                
+                # Add equipment
+                equipment_id = db_manager.add_equipment(
+                    equipment_type, name, serial_number, purchase_date, first_use_date
+                )
+                
+                flash(f'Equipment {equipment_id} added successfully!', 'success')
+                return redirect(url_for('index'))
         
         except Exception as e:
             flash(f'Error adding equipment: {str(e)}', 'error')

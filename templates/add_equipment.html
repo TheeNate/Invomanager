@@ -37,9 +37,26 @@
 
                     <div class="mb-3">
                         <label for="serial_number" class="form-label">Serial Number</label>
-                        <input type="text" name="serial_number" id="serial_number" class="form-control" 
-                               placeholder="Enter serial number (optional)"
-                               value="{{ form_data.serial_number if form_data }}">
+                        <div class="input-group">
+                            <input type="text" name="serial_number" id="serial_number" class="form-control" 
+                                   placeholder="Enter serial number (optional)"
+                                   value="{{ form_data.serial_number if form_data }}">
+                            <button type="button" id="batch-toggle-btn" class="btn btn-outline-secondary">
+                                Batch Add
+                            </button>
+                        </div>
+                        
+                        <!-- Batch quantity input (initially hidden) -->
+                        <div id="batch-quantity-container" class="mt-2" style="display: none;">
+                            <input type="number" id="batch-quantity" class="form-control" 
+                                   placeholder="Batch quantity" min="2" max="50">
+                        </div>
+                        
+                        <!-- Batch serial numbers container (initially hidden) -->
+                        <div id="batch-serials-container" class="mt-3" style="display: none;">
+                            <label class="form-label">Serial Numbers for Batch:</label>
+                            <div id="batch-serials-inputs"></div>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -68,6 +85,7 @@
                             <li>Soft goods (ropes, harnesses) have 10-year expiration from first use</li>
                             <li>Hardware (descenders, devices) have unlimited lifespan</li>
                             <li>All equipment requires inspection every 6 months</li>
+                            <li><strong>Batch Add:</strong> Create multiple items of the same type with individual serial numbers (2-50 items)</li>
                         </ul>
                     </div>
 
@@ -75,7 +93,7 @@
                         <a href="{{ url_for('index') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Back to List
                         </a>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
                             <i class="bi bi-plus-circle"></i> Add Equipment
                         </button>
                     </div>
@@ -84,4 +102,98 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const batchToggleBtn = document.getElementById('batch-toggle-btn');
+    const batchQuantityContainer = document.getElementById('batch-quantity-container');
+    const batchQuantityInput = document.getElementById('batch-quantity');
+    const batchSerialsContainer = document.getElementById('batch-serials-container');
+    const batchSerialsInputs = document.getElementById('batch-serials-inputs');
+    const serialNumberInput = document.getElementById('serial_number');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    let batchMode = false;
+    
+    batchToggleBtn.addEventListener('click', function() {
+        batchMode = !batchMode;
+        
+        if (batchMode) {
+            // Switch to batch mode
+            batchToggleBtn.textContent = 'Single Add';
+            batchToggleBtn.className = 'btn btn-warning';
+            batchQuantityContainer.style.display = 'block';
+            serialNumberInput.style.display = 'none';
+            submitBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Add Batch Equipment';
+        } else {
+            // Switch back to single mode
+            batchToggleBtn.textContent = 'Batch Add';
+            batchToggleBtn.className = 'btn btn-outline-secondary';
+            batchQuantityContainer.style.display = 'none';
+            batchSerialsContainer.style.display = 'none';
+            serialNumberInput.style.display = 'block';
+            batchSerialsInputs.innerHTML = '';
+            batchQuantityInput.value = '';
+            submitBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Add Equipment';
+        }
+    });
+    
+    batchQuantityInput.addEventListener('input', function() {
+        const quantity = parseInt(this.value);
+        
+        if (quantity >= 2 && quantity <= 50) {
+            batchSerialsContainer.style.display = 'block';
+            generateBatchSerialInputs(quantity);
+        } else {
+            batchSerialsContainer.style.display = 'none';
+            batchSerialsInputs.innerHTML = '';
+        }
+    });
+    
+    function generateBatchSerialInputs(quantity) {
+        batchSerialsInputs.innerHTML = '';
+        
+        for (let i = 1; i <= quantity; i++) {
+            const inputGroup = document.createElement('div');
+            inputGroup.className = 'input-group mb-2';
+            
+            const label = document.createElement('span');
+            label.className = 'input-group-text';
+            label.textContent = `#${i}`;
+            label.style.minWidth = '45px';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = `batch_serial_${i}`;
+            input.className = 'form-control';
+            input.placeholder = `Serial number for item ${i}`;
+            
+            inputGroup.appendChild(label);
+            inputGroup.appendChild(input);
+            batchSerialsInputs.appendChild(inputGroup);
+        }
+    }
+    
+    // Handle form submission
+    document.querySelector('form').addEventListener('submit', function(e) {
+        if (batchMode) {
+            const quantity = parseInt(batchQuantityInput.value);
+            if (quantity >= 2 && quantity <= 50) {
+                // Add hidden input to indicate batch mode
+                const batchModeInput = document.createElement('input');
+                batchModeInput.type = 'hidden';
+                batchModeInput.name = 'batch_mode';
+                batchModeInput.value = 'true';
+                this.appendChild(batchModeInput);
+                
+                const batchQuantityHidden = document.createElement('input');
+                batchQuantityHidden.type = 'hidden';
+                batchQuantityHidden.name = 'batch_quantity';
+                batchQuantityHidden.value = quantity;
+                this.appendChild(batchQuantityHidden);
+            }
+        }
+    });
+});
+</script>
 {% endblock %}
