@@ -48,6 +48,7 @@ def index():
             equipment_list = [
                 eq for eq in equipment_list
                 if search_term in eq['equipment_id'].lower() or
+                   search_term in (eq['name'] or '').lower() or
                    search_term in (eq['serial_number'] or '').lower() or
                    search_term in (eq['type_description'] or '').lower()
             ]
@@ -87,6 +88,7 @@ def add_equipment():
         try:
             # Get form data
             equipment_type = request.form.get('equipment_type')
+            name = request.form.get('name', '').strip() or None
             serial_number = request.form.get('serial_number', '').strip() or None
             purchase_date = parse_date(request.form.get('purchase_date', '').strip())
             first_use_date = parse_date(request.form.get('first_use_date', '').strip())
@@ -106,7 +108,7 @@ def add_equipment():
             
             # Add equipment
             equipment_id = db_manager.add_equipment(
-                equipment_type, serial_number, purchase_date, first_use_date
+                equipment_type, name, serial_number, purchase_date, first_use_date
             )
             
             flash(f'Equipment {equipment_id} added successfully!', 'success')

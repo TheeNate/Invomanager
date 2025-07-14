@@ -18,13 +18,13 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture
 - **Language**: Python 3
-- **Database**: SQLite (embedded database)
+- **Database**: PostgreSQL (cloud database with proper connection handling)
 - **Pattern**: Data Access Object (DAO) pattern with centralized DatabaseManager
 - **Models**: Dataclass-based models with business logic separation
 
 ### Data Storage Solutions
-- **Primary Database**: SQLite with the following key tables:
-  - Equipment: Core equipment tracking with unique IDs and status
+- **Primary Database**: PostgreSQL with the following key tables:
+  - Equipment: Core equipment tracking with unique IDs, names, and status
   - Equipment_Types: Equipment categories with validation rules
   - Inspections: 6-month inspection cycle tracking
   - Status_Changes: Audit trail for equipment status changes
@@ -37,10 +37,10 @@ Preferred communication style: Simple, everyday language.
 
 ## Key Components
 
-### Database Layer (`database.py`)
-- SQLite connection management with row factory for named column access
-- Database initialization and schema creation
-- CRUD operations for all equipment data
+### Database Layer (`database_postgres.py`)
+- PostgreSQL connection management with environment variable configuration
+- Database initialization and schema creation with proper constraints
+- CRUD operations for all equipment data including name field
 - Transaction management and connection pooling
 
 ### Business Logic (`models.py`)
@@ -93,11 +93,16 @@ Preferred communication style: Simple, everyday language.
 - Manual backup/restore through SQLite file copying
 - Cross-platform compatibility (Windows, macOS, Linux)
 
+### Recent Changes
+- **July 14, 2025**: Successfully upgraded from SQLite to PostgreSQL database
+- **July 14, 2025**: Added Name column to equipment table between Equipment ID and Type
+- **July 14, 2025**: Enhanced search functionality to include equipment names
+- **July 14, 2025**: Updated all templates to display and input equipment names
+
 ### Future Scalability
-- Database can be migrated to PostgreSQL for multi-user support
-- UI can be web-based for remote access
 - Authentication system can be added for user management
 - Cloud storage integration for data synchronization
+- Multi-tenant support for organizations
 
 ## Business Rules Implementation
 

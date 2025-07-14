@@ -36,6 +36,11 @@
                     <dt class="col-sm-5">Equipment ID:</dt>
                     <dd class="col-sm-7"><code>{{ equipment.equipment_id }}</code></dd>
                     
+                    <dt class="col-sm-5">Name:</dt>
+                    <dd class="col-sm-7">
+                        {{ equipment.name or '<em class="text-muted">Not specified</em>' | safe }}
+                    </dd>
+                    
                     <dt class="col-sm-5">Type:</dt>
                     <dd class="col-sm-7">
                         <span class="badge bg-secondary me-1">{{ equipment.equipment_type }}</span>

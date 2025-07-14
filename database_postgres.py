@@ -67,6 +67,7 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS Equipment (
                 equipment_id VARCHAR(8) PRIMARY KEY,
                 equipment_type VARCHAR(2) NOT NULL,
+                name VARCHAR(100),
                 status VARCHAR(20) DEFAULT 'ACTIVE',
                 serial_number VARCHAR(50),
                 purchase_date DATE,
@@ -121,7 +122,7 @@ class DatabaseManager:
             """, type_data)
     
     # Equipment CRUD operations
-    def add_equipment(self, equipment_type: str, serial_number: str = None, 
+    def add_equipment(self, equipment_type: str, name: str = None, serial_number: str = None, 
                      purchase_date: date = None, first_use_date: date = None) -> str:
         """Add new equipment and return the generated ID"""
         conn = self.connect()
@@ -132,9 +133,9 @@ class DatabaseManager:
             equipment_id = self._generate_equipment_id(equipment_type)
             
             cursor.execute("""
-                INSERT INTO Equipment (equipment_id, equipment_type, serial_number, purchase_date, first_use_date)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (equipment_id, equipment_type, serial_number, purchase_date, first_use_date))
+                INSERT INTO Equipment (equipment_id, equipment_type, name, serial_number, purchase_date, first_use_date)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (equipment_id, equipment_type, name, serial_number, purchase_date, first_use_date))
             
             # Record initial status change
             cursor.execute("""
