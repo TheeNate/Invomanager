@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Add Equipment - Equipment Inventory{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-plus-circle"></i> Add New Equipment
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="equipment_type" class="form-label">Equipment Type <span class="text-danger">*</span></label>
+                        <select name="equipment_type" id="equipment_type" class="form-select" required>
+                            <option value="">Select equipment type...</option>
+                            {% for eq_type in equipment_types %}
+                                <option value="{{ eq_type.type_code }}" 
+                                        {{ 'selected' if form_data and form_data.equipment_type == eq_type.type_code }}>
+                                    {{ eq_type.type_code }} - {{ eq_type.description }}
+                                    {% if eq_type.is_soft_goods %}(Soft Goods){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Equipment ID will be auto-generated based on type</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="serial_number" class="form-label">Serial Number</label>
+                        <input type="text" name="serial_number" id="serial_number" class="form-control" 
+                               placeholder="Enter serial number (optional)"
+                               value="{{ form_data.serial_number if form_data }}">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="purchase_date" class="form-label">Purchase Date</label>
+                                <input type="date" name="purchase_date" id="purchase_date" class="form-control"
+                                       value="{{ form_data.purchase_date if form_data }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="first_use_date" class="form-label">First Use Date</label>
+                                <input type="date" name="first_use_date" id="first_use_date" class="form-control"
+                                       value="{{ form_data.first_use_date if form_data }}">
+                                <div class="form-text">Required for soft goods expiration tracking</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Business Rules:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Equipment will be created with ACTIVE status</li>
+                            <li>Soft goods (ropes, harnesses) have 10-year expiration from first use</li>
+                            <li>Hardware (descenders, devices) have unlimited lifespan</li>
+                            <li>All equipment requires inspection every 6 months</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to List
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Add Equipment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

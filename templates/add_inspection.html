@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Add Inspection - Equipment Inventory{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-clipboard-check"></i> Record Equipment Inspection
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Equipment Selection -->
+                    <div class="mb-4">
+                        <label for="equipment_id" class="form-label">Equipment <span class="text-danger">*</span></label>
+                        {% if selected_equipment_id %}
+                            <input type="hidden" name="equipment_id" value="{{ selected_equipment_id }}">
+                            <div class="form-control-plaintext">
+                                <strong>{{ selected_equipment_id }}</strong>
+                                {% for equipment in active_equipment %}
+                                    {% if equipment.equipment_id == selected_equipment_id %}
+                                        - {{ equipment.type_description }}
+                                        {% if equipment.serial_number %}
+                                            (S/N: {{ equipment.serial_number }})
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <select name="equipment_id" id="equipment_id" class="form-select" required>
+                                <option value="">Select equipment to inspect...</option>
+                                {% for equipment in active_equipment %}
+                                    <option value="{{ equipment.equipment_id }}" 
+                                            {{ 'selected' if form_data and form_data.equipment_id == equipment.equipment_id }}>
+                                        {{ equipment.equipment_id }} - {{ equipment.type_description }}
+                                        {% if equipment.serial_number %}(S/N: {{ equipment.serial_number }}){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% endif %}
+                    </div>
+
+                    <!-- Inspection Details -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="inspection_date" class="form-label">Inspection Date <span class="text-danger">*</span></label>
+                                <input type="date" name="inspection_date" id="inspection_date" class="form-control" 
+                                       value="{{ form_data.inspection_date if form_data else today }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="inspector_name" class="form-label">Inspector Name <span class="text-danger">*</span></label>
+                                <input type="text" name="inspector_name" id="inspector_name" class="form-control" 
+                                       placeholder="Enter inspector name" 
+                                       value="{{ form_data.inspector_name if form_data }}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inspection Result -->
+                    <div class="mb-4">
+                        <label class="form-label">Inspection Result <span class="text-danger">*</span></label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="result" id="result_pass" 
+                                           value="PASS" {{ 'checked' if not form_data or form_data.result == 'PASS' }} required>
+                                    <label class="form-check-label" for="result_pass">
+                                        <span class="badge bg-success me-2">
+                                            <i class="bi bi-check-circle"></i> PASS
+                                        </span>
+                                        Equipment passed inspection
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="result" id="result_fail" 
+                                           value="FAIL" {{ 'checked' if form_data and form_data.result == 'FAIL' }} required>
+                                    <label class="form-check-label" for="result_fail">
+                                        <span class="badge bg-danger me-2">
+                                            <i class="bi bi-x-circle"></i> FAIL
+                                        </span>
+                                        Equipment failed inspection
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="fail-warning" class="alert alert-warning mt-3" style="display: none;">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Warning:</strong> Failed inspections will automatically RED TAG the equipment. 
+                            Red tagged equipment cannot return to service and must be destroyed within 30 days.
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-4">
+                        <label for="notes" class="form-label">Inspection Notes</label>
+                        <textarea name="notes" id="notes" class="form-control" rows="4" 
+                                  placeholder="Enter any notes about the inspection (optional)">{{ form_data.notes if form_data }}</textarea>
+                        <div class="form-text">
+                            Document any issues found, maintenance performed, or other relevant observations.
+                        </div>
+                    </div>
+
+                    <!-- Business Rules Info -->
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Inspection Requirements:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>All equipment must be inspected every 6 months</li>
+                            <li>Failed inspections automatically red tag the equipment</li>
+                            <li>Red tagged equipment must be destroyed within 30 days</li>
+                            <li>Record detailed notes for any issues or concerns</li>
+                        </ul>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to List
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-clipboard-check"></i> Record Inspection
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resultRadios = document.querySelectorAll('input[name="result"]');
+    const failWarning = document.getElementById('fail-warning');
+    
+    function toggleFailWarning() {
+        const failSelected = document.getElementById('result_fail').checked;
+        failWarning.style.display = failSelected ? 'block' : 'none';
+    }
+    
+    resultRadios.forEach(radio => {
+        radio.addEventListener('change', toggleFailWarning);
+    });
+    
+    // Check initial state
+    toggleFailWarning();
+});
+</script>
+{% endblock %}

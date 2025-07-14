@@ -15,10 +15,10 @@ class DatabaseManager:
         
     def connect(self):
         """Establish database connection"""
-        if self.connection is None:
-            self.connection = sqlite3.connect(self.db_path)
-            self.connection.row_factory = sqlite3.Row  # Enable column access by name
-        return self.connection
+        # Always create a new connection for thread safety
+        connection = sqlite3.connect(self.db_path, check_same_thread=False)
+        connection.row_factory = sqlite3.Row  # Enable column access by name
+        return connection
     
     def close(self):
         """Close database connection"""
@@ -117,87 +117,99 @@ class DatabaseManager:
                      purchase_date: date = None, first_use_date: date = None) -> str:
         """Add new equipment and return the generated ID"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        # Generate next equipment ID
-        equipment_id = self._generate_equipment_id(equipment_type)
-        
-        cursor.execute("""
-            INSERT INTO Equipment (equipment_id, equipment_type, serial_number, purchase_date, first_use_date)
-            VALUES (?, ?, ?, ?, ?)
-        """, (equipment_id, equipment_type, serial_number, purchase_date, first_use_date))
-        
-        # Record initial status change
-        cursor.execute("""
-            INSERT INTO Status_Changes (equipment_id, old_status, new_status)
-            VALUES (?, NULL, 'ACTIVE')
-        """, (equipment_id,))
-        
-        conn.commit()
-        return equipment_id
+        try:
+            cursor = conn.cursor()
+            
+            # Generate next equipment ID
+            equipment_id = self._generate_equipment_id(equipment_type)
+            
+            cursor.execute("""
+                INSERT INTO Equipment (equipment_id, equipment_type, serial_number, purchase_date, first_use_date)
+                VALUES (?, ?, ?, ?, ?)
+            """, (equipment_id, equipment_type, serial_number, purchase_date, first_use_date))
+            
+            # Record initial status change
+            cursor.execute("""
+                INSERT INTO Status_Changes (equipment_id, old_status, new_status)
+                VALUES (?, NULL, 'ACTIVE')
+            """, (equipment_id,))
+            
+            conn.commit()
+            return equipment_id
+        finally:
+            conn.close()
     
     def _generate_equipment_id(self, equipment_type: str) -> str:
         """Generate next available equipment ID for given type"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT equipment_id FROM Equipment 
-            WHERE equipment_type = ? 
-            ORDER BY equipment_id DESC LIMIT 1
-        """, (equipment_type,))
-        
-        result = cursor.fetchone()
-        if result:
-            last_id = result[0]
-            # Extract number part and increment
-            number_part = int(last_id.split('/')[1])
-            next_number = number_part + 1
-        else:
-            next_number = 1
-        
-        return f"{equipment_type}/{next_number:03d}"
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT equipment_id FROM Equipment 
+                WHERE equipment_type = ? 
+                ORDER BY equipment_id DESC LIMIT 1
+            """, (equipment_type,))
+            
+            result = cursor.fetchone()
+            if result:
+                last_id = result[0]
+                # Extract number part and increment
+                number_part = int(last_id.split('/')[1])
+                next_number = number_part + 1
+            else:
+                next_number = 1
+            
+            return f"{equipment_type}/{next_number:03d}"
+        finally:
+            conn.close()
     
     def get_equipment_list(self, status_filter: str = None, type_filter: str = None) -> List[Dict]:
         """Get list of equipment with optional filters"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        query = """
-            SELECT e.*, et.description as type_description
-            FROM Equipment e
-            JOIN Equipment_Types et ON e.equipment_type = et.type_code
-            WHERE 1=1
-        """
-        params = []
-        
-        if status_filter:
-            query += " AND e.status = ?"
-            params.append(status_filter)
-        
-        if type_filter:
-            query += " AND e.equipment_type = ?"
-            params.append(type_filter)
-        
-        query += " ORDER BY e.equipment_type, e.equipment_id"
-        
-        cursor.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor = conn.cursor()
+            
+            query = """
+                SELECT e.*, et.description as type_description
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                WHERE 1=1
+            """
+            params = []
+            
+            if status_filter:
+                query += " AND e.status = ?"
+                params.append(status_filter)
+            
+            if type_filter:
+                query += " AND e.equipment_type = ?"
+                params.append(type_filter)
+            
+            query += " ORDER BY e.equipment_type, e.equipment_id"
+            
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def get_equipment_by_id(self, equipment_id: str) -> Optional[Dict]:
         """Get equipment details by ID"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT e.*, et.description as type_description, et.is_soft_goods, et.lifespan_years
-            FROM Equipment e
-            JOIN Equipment_Types et ON e.equipment_type = et.type_code
-            WHERE e.equipment_id = ?
-        """, (equipment_id,))
-        
-        result = cursor.fetchone()
-        return dict(result) if result else None
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT e.*, et.description as type_description, et.is_soft_goods, et.lifespan_years
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                WHERE e.equipment_id = ?
+            """, (equipment_id,))
+            
+            result = cursor.fetchone()
+            return dict(result) if result else None
+        finally:
+            conn.close()
     
     def update_equipment_status(self, equipment_id: str, new_status: str) -> bool:
         """Update equipment status and record the change"""
@@ -281,23 +293,26 @@ class DatabaseManager:
     def get_equipment_types(self, active_only: bool = True) -> List[Dict]:
         """Get equipment types"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        query = "SELECT * FROM Equipment_Types"
-        if active_only:
-            query += " WHERE is_active = 1"
-        query += " ORDER BY sort_order, type_code"
-        
-        cursor.execute(query)
-        return [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM Equipment_Types"
+            if active_only:
+                query += " WHERE is_active = 1"
+            query += " ORDER BY sort_order, type_code"
+            
+            cursor.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def add_equipment_type(self, type_code: str, description: str, is_soft_goods: bool = False,
                           lifespan_years: int = None, inspection_interval_months: int = 6) -> bool:
         """Add new equipment type"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
         try:
+            cursor = conn.cursor()
+            
             # Get next sort order
             cursor.execute("SELECT MAX(sort_order) FROM Equipment_Types")
             max_sort = cursor.fetchone()[0] or 0
@@ -312,6 +327,8 @@ class DatabaseManager:
             return True
         except sqlite3.IntegrityError:
             return False
+        finally:
+            conn.close()
     
     def update_equipment_type(self, type_code: str, description: str, is_soft_goods: bool = False,
                              lifespan_years: int = None, inspection_interval_months: int = 6) -> bool:
@@ -344,75 +361,84 @@ class DatabaseManager:
     def get_overdue_inspections(self) -> List[Dict]:
         """Get equipment with overdue inspections"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT e.equipment_id, e.equipment_type, et.description as type_description,
-                   e.status, i.inspection_date as last_inspection_date,
-                   et.inspection_interval_months,
-                   DATE(i.inspection_date, '+' || et.inspection_interval_months || ' months') as next_due_date
-            FROM Equipment e
-            JOIN Equipment_Types et ON e.equipment_type = et.type_code
-            LEFT JOIN (
-                SELECT equipment_id, MAX(inspection_date) as inspection_date
-                FROM Inspections 
-                GROUP BY equipment_id
-            ) latest ON e.equipment_id = latest.equipment_id
-            LEFT JOIN Inspections i ON latest.equipment_id = i.equipment_id 
-                AND latest.inspection_date = i.inspection_date
-            WHERE e.status = 'ACTIVE'
-            AND (
-                i.inspection_date IS NULL OR 
-                DATE(i.inspection_date, '+' || et.inspection_interval_months || ' months') < DATE('now')
-            )
-            ORDER BY i.inspection_date ASC
-        """)
-        
-        return [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT e.equipment_id, e.equipment_type, et.description as type_description,
+                       e.status, i.inspection_date as last_inspection_date,
+                       et.inspection_interval_months,
+                       DATE(i.inspection_date, '+' || et.inspection_interval_months || ' months') as next_due_date
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                LEFT JOIN (
+                    SELECT equipment_id, MAX(inspection_date) as inspection_date
+                    FROM Inspections 
+                    GROUP BY equipment_id
+                ) latest ON e.equipment_id = latest.equipment_id
+                LEFT JOIN Inspections i ON latest.equipment_id = i.equipment_id 
+                    AND latest.inspection_date = i.inspection_date
+                WHERE e.status = 'ACTIVE'
+                AND (
+                    i.inspection_date IS NULL OR 
+                    DATE(i.inspection_date, '+' || et.inspection_interval_months || ' months') < DATE('now')
+                )
+                ORDER BY i.inspection_date ASC
+            """)
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def get_red_tagged_equipment(self) -> List[Dict]:
         """Get red tagged equipment with days remaining"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT e.equipment_id, e.equipment_type, et.description as type_description,
-                   sc.red_tag_date,
-                   DATE(sc.red_tag_date, '+30 days') as destroy_by_date,
-                   (JULIANDAY(DATE(sc.red_tag_date, '+30 days')) - JULIANDAY(DATE('now'))) as days_remaining
-            FROM Equipment e
-            JOIN Equipment_Types et ON e.equipment_type = et.type_code
-            JOIN Status_Changes sc ON e.equipment_id = sc.equipment_id
-            WHERE e.status = 'RED_TAGGED'
-            AND sc.new_status = 'RED_TAGGED'
-            AND sc.red_tag_date IS NOT NULL
-            ORDER BY sc.red_tag_date ASC
-        """)
-        
-        return [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT e.equipment_id, e.equipment_type, et.description as type_description,
+                       sc.red_tag_date,
+                       DATE(sc.red_tag_date, '+30 days') as destroy_by_date,
+                       (JULIANDAY(DATE(sc.red_tag_date, '+30 days')) - JULIANDAY(DATE('now'))) as days_remaining
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                JOIN Status_Changes sc ON e.equipment_id = sc.equipment_id
+                WHERE e.status = 'RED_TAGGED'
+                AND sc.new_status = 'RED_TAGGED'
+                AND sc.red_tag_date IS NOT NULL
+                ORDER BY sc.red_tag_date ASC
+            """)
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def get_expiring_soft_goods(self) -> List[Dict]:
         """Get soft goods approaching 10-year expiration"""
         conn = self.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT e.equipment_id, e.equipment_type, et.description as type_description,
-                   e.first_use_date,
-                   DATE(e.first_use_date, '+' || et.lifespan_years || ' years') as expiry_date,
-                   (JULIANDAY(DATE(e.first_use_date, '+' || et.lifespan_years || ' years')) - JULIANDAY(DATE('now'))) as days_remaining
-            FROM Equipment e
-            JOIN Equipment_Types et ON e.equipment_type = et.type_code
-            WHERE e.status = 'ACTIVE'
-            AND et.is_soft_goods = 1
-            AND e.first_use_date IS NOT NULL
-            AND et.lifespan_years IS NOT NULL
-            AND DATE(e.first_use_date, '+' || et.lifespan_years || ' years') > DATE('now')
-            AND DATE(e.first_use_date, '+' || et.lifespan_years || ' years') <= DATE('now', '+1 year')
-            ORDER BY expiry_date ASC
-        """)
-        
-        return [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT e.equipment_id, e.equipment_type, et.description as type_description,
+                       e.first_use_date,
+                       DATE(e.first_use_date, '+' || et.lifespan_years || ' years') as expiry_date,
+                       (JULIANDAY(DATE(e.first_use_date, '+' || et.lifespan_years || ' years')) - JULIANDAY(DATE('now'))) as days_remaining
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                WHERE e.status = 'ACTIVE'
+                AND et.is_soft_goods = 1
+                AND e.first_use_date IS NOT NULL
+                AND et.lifespan_years IS NOT NULL
+                AND DATE(e.first_use_date, '+' || et.lifespan_years || ' years') > DATE('now')
+                AND DATE(e.first_use_date, '+' || et.lifespan_years || ' years') <= DATE('now', '+1 year')
+                ORDER BY expiry_date ASC
+            """)
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def export_to_csv(self, table_name: str, filename: str) -> bool:
         """Export table data to CSV"""

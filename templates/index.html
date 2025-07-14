@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Equipment List - Equipment Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2">Equipment Inventory</h1>
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('add_equipment') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Equipment
+        </a>
+        <a href="{{ url_for('add_inspection') }}" class="btn btn-outline-primary">
+            <i class="bi bi-clipboard-check"></i> Add Inspection
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('index') }}" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="All" {{ 'selected' if current_filters.status == 'All' }}>All Statuses</option>
+                    <option value="ACTIVE" {{ 'selected' if current_filters.status == 'ACTIVE' }}>Active</option>
+                    <option value="RED_TAGGED" {{ 'selected' if current_filters.status == 'RED_TAGGED' }}>Red Tagged</option>
+                    <option value="DESTROYED" {{ 'selected' if current_filters.status == 'DESTROYED' }}>Destroyed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="type" class="form-label">Type</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="All" {{ 'selected' if current_filters.type == 'All' }}>All Types</option>
+                    {% for eq_type in equipment_types %}
+                        <option value="{{ eq_type.type_code }}" {{ 'selected' if current_filters.type == eq_type.type_code }}>
+                            {{ eq_type.type_code }} - {{ eq_type.description }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" name="search" id="search" class="form-control" 
+                       placeholder="Equipment ID, Serial Number..." 
+                       value="{{ current_filters.search }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Equipment List -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Equipment List ({{ equipment_list|length }} items)</h5>
+        <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-graph-up"></i> View Reports
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if equipment_list %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Equipment ID</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Serial Number</th>
+                            <th>Status</th>
+                            <th>Last Inspection</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for equipment in equipment_list %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('equipment_details', equipment_id=equipment.equipment_id) }}" 
+                                       class="text-decoration-none fw-bold">
+                                        {{ equipment.equipment_id }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ equipment.equipment_type }}</span>
+                                </td>
+                                <td>{{ equipment.type_description }}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ equipment.serial_number or 'Not specified' }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ equipment.status | status_color }} status-badge">
+                                        {% if equipment.status == 'ACTIVE' %}
+                                            <i class="bi bi-check-circle"></i> Active
+                                        {% elif equipment.status == 'RED_TAGGED' %}
+                                            <i class="bi bi-exclamation-triangle"></i> Red Tagged
+                                        {% elif equipment.status == 'DESTROYED' %}
+                                            <i class="bi bi-x-circle"></i> Destroyed
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if equipment.last_inspection %}
+                                        <small>
+                                            {{ equipment.last_inspection.inspection_date | date_format }}
+                                            <span class="badge bg-{{ equipment.last_inspection.result | result_color }} ms-1">
+                                                {{ equipment.last_inspection.result }}
+                                            </span>
+                                        </small>
+                                    {% else %}
+                                        <small class="text-warning">
+                                            <i class="bi bi-exclamation-triangle"></i> Never inspected
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm btn-group-actions" role="group">
+                                        <a href="{{ url_for('equipment_details', equipment_id=equipment.equipment_id) }}" 
+                                           class="btn btn-outline-primary" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if equipment.status == 'ACTIVE' %}
+                                            <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" 
+                                               class="btn btn-outline-success" title="Add Inspection">
+                                                <i class="bi bi-clipboard-check"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">No equipment found</h4>
+                <p class="text-muted">
+                    {% if current_filters.status != 'All' or current_filters.type != 'All' or current_filters.search %}
+                        Try adjusting your filters or <a href="{{ url_for('index') }}">clear all filters</a>.
+                    {% else %}
+                        Get started by <a href="{{ url_for('add_equipment') }}">adding your first piece of equipment</a>.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

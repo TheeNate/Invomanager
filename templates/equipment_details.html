@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}{{ equipment.equipment_id }} Details - Equipment Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2">
+        Equipment Details: {{ equipment.equipment_id }}
+        <span class="badge bg-{{ equipment.status | status_color }} ms-2">
+            {{ equipment.status.replace('_', ' ').title() }}
+        </span>
+    </h1>
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+        {% if equipment.status == 'ACTIVE' %}
+            <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" class="btn btn-primary">
+                <i class="bi bi-clipboard-check"></i> Add Inspection
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <!-- Equipment Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> Equipment Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5">Equipment ID:</dt>
+                    <dd class="col-sm-7"><code>{{ equipment.equipment_id }}</code></dd>
+                    
+                    <dt class="col-sm-5">Type:</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge bg-secondary me-1">{{ equipment.equipment_type }}</span>
+                        {{ equipment.type_description }}
+                    </dd>
+                    
+                    <dt class="col-sm-5">Category:</dt>
+                    <dd class="col-sm-7">
+                        {% if equipment.is_soft_goods %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-clock"></i> Soft Goods
+                            </span>
+                            <small class="text-muted d-block">Has expiration date</small>
+                        {% else %}
+                            <span class="badge bg-info">
+                                <i class="bi bi-gear"></i> Hardware
+                            </span>
+                            <small class="text-muted d-block">No expiration</small>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-5">Serial Number:</dt>
+                    <dd class="col-sm-7">
+                        {{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}
+                    </dd>
+                    
+                    <dt class="col-sm-5">Purchase Date:</dt>
+                    <dd class="col-sm-7">
+                        {{ equipment.purchase_date | date_format or '<em class="text-muted">Not specified</em>' | safe }}
+                    </dd>
+                    
+                    <dt class="col-sm-5">First Use Date:</dt>
+                    <dd class="col-sm-7">
+                        {{ equipment.first_use_date | date_format or '<em class="text-muted">Not specified</em>' | safe }}
+                        {% if equipment.is_soft_goods and equipment.first_use_date %}
+                            <small class="text-muted d-block">
+                                Expires: {{ (equipment.first_use_date | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.first_use_date | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
+                            </small>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-5">Created:</dt>
+                    <dd class="col-sm-7">
+                        <small class="text-muted">{{ equipment.created_at | date_format('%Y-%m-%d %H:%M') }}</small>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Status Management -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i> Status Management
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_equipment_status', equipment_id=equipment.equipment_id) }}">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Change Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="ACTIVE" {{ 'selected' if equipment.status == 'ACTIVE' }}>
+                                Active - In service
+                            </option>
+                            <option value="RED_TAGGED" {{ 'selected' if equipment.status == 'RED_TAGGED' }}>
+                                Red Tagged - Failed inspection (30 days to destroy)
+                            </option>
+                            <option value="DESTROYED" {{ 'selected' if equipment.status == 'DESTROYED' }}>
+                                Destroyed - Permanently removed from service
+                            </option>
+                        </select>
+                    </div>
+                    
+                    {% if equipment.status == 'RED_TAGGED' %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Warning:</strong> Red tagged equipment cannot return to active service and must be destroyed within 30 days.
+                        </div>
+                    {% endif %}
+                    
+                    <button type="submit" class="btn btn-warning" 
+                            onclick="return confirm('Are you sure you want to change the equipment status?')">
+                        <i class="bi bi-arrow-repeat"></i> Update Status
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <!-- Inspection History -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clipboard-check"></i> Inspection History
+                </h5>
+                {% if equipment.status == 'ACTIVE' %}
+                    <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" 
+                       class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> Add Inspection
+                    </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if inspections %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Result</th>
+                                    <th>Inspector</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inspection in inspections %}
+                                    <tr>
+                                        <td>
+                                            <small>{{ inspection.inspection_date | date_format }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ inspection.result | result_color }}">
+                                                {% if inspection.result == 'PASS' %}
+                                                    <i class="bi bi-check-circle"></i> Pass
+                                                {% else %}
+                                                    <i class="bi bi-x-circle"></i> Fail
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small>{{ inspection.inspector_name }}</small>
+                                        </td>
+                                        <td>
+                                            {% if inspection.notes %}
+                                                <small class="text-muted" title="{{ inspection.notes }}">
+                                                    {{ inspection.notes[:30] }}{% if inspection.notes|length > 30 %}...{% endif %}
+                                                </small>
+                                            {% else %}
+                                                <small class="text-muted">No notes</small>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-clipboard-x display-4 text-muted"></i>
+                        <h6 class="text-muted mt-2">No inspections recorded</h6>
+                        <p class="text-muted small mb-0">
+                            {% if equipment.status == 'ACTIVE' %}
+                                <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}">
+                                    Record the first inspection
+                                </a>
+                            {% else %}
+                                Equipment is not active for inspection
+                            {% endif %}
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

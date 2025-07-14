@@ -13,12 +13,17 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Equipment Inventory Desktop"
+args = "Equipment Inventory Web App"
 
 [[workflows.workflow]]
-name = "Equipment Inventory Desktop"
+name = "Equipment Inventory Web App"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "DISPLAY=:1 python main.py"
+args = "python app.py"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
