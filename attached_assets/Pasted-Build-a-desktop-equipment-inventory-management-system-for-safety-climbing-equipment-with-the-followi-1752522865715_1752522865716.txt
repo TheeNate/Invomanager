@@ -1,0 +1,87 @@
+Build a desktop equipment inventory management system for safety/climbing equipment with the following requirements:
+
+CORE FUNCTIONALITY:
+- Equipment tracking with unique IDs (format: [TYPE]/[001-999] like D/001, B/002, R/003)
+- 6-month mandatory inspection cycles with pass/fail results
+- Three equipment statuses: Active, Red Tagged (30-day max), Destroyed
+- Soft goods have 10-year lifespan from first use date
+- Hardware has unlimited lifespan (inspection-dependent only)
+- 7-year record retention requirement
+
+DATABASE SCHEMA:
+```sql
+Equipment (
+    equipment_id VARCHAR(8) PRIMARY KEY,
+    equipment_type VARCHAR(2),
+    serial_number VARCHAR(50),
+    purchase_date DATE,
+    first_use_date DATE,
+    status ENUM('ACTIVE', 'RED_TAGGED', 'DESTROYED'),
+    created_at TIMESTAMP
+)
+
+Equipment_Types (
+    type_code VARCHAR(2) PRIMARY KEY,
+    description VARCHAR(100),
+    is_soft_goods BOOLEAN,
+    lifespan_years INT,
+    inspection_interval_months INT DEFAULT 6,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT
+)
+
+Inspections (
+    inspection_id INT AUTO_INCREMENT PRIMARY KEY,
+    equipment_id VARCHAR(8),
+    inspection_date DATE,
+    result ENUM('PASS', 'FAIL'),
+    inspector_name VARCHAR(100),
+    notes TEXT
+)
+
+Status_Changes (
+    change_id INT AUTO_INCREMENT PRIMARY KEY,
+    equipment_id VARCHAR(8),
+    old_status VARCHAR(20),
+    new_status VARCHAR(20),
+    change_date TIMESTAMP,
+    red_tag_date DATE
+)
+BUSINESS RULES:
+
+Red tagged equipment never returns to service
+Failed inspections automatically red tag equipment
+Red tagged equipment must be destroyed after 30 days
+Overdue inspection tracking (no hard blocks)
+Equipment types can be added/removed dynamically
+
+UI REQUIREMENTS:
+
+Main dashboard with equipment list, status overview, quick actions
+Equipment detail view with full inspection history
+Inspection recording form with pass/fail options
+Reports dashboard showing overdue inspections, red tag countdown, expiring equipment
+Equipment type management (add/edit/disable type codes)
+Search and filter by ID, type, status
+Sort by equipment type code (D, B, R, H, etc.)
+
+TECHNICAL SPECS:
+
+Desktop application (suggest Electron or Python with Tkinter)
+SQLite database (local file)
+Offline operation required
+Data export to CSV
+Auto-backup functionality
+Print capability for inspection reports
+
+SAMPLE DATA:
+Create with equipment types: D (Descender), R (Rope), H (Harness), B (Backup)
+Add 10-15 sample equipment items with various statuses and inspection histories
+Start with a basic working version focusing on:
+
+Add/view equipment
+Record inspections
+Basic status management
+Equipment type management
+
+Make the UI clean and functional - prioritize usability over aesthetics.
