@@ -7,10 +7,14 @@ Flask-based web interface for safety equipment tracking
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from datetime import date, datetime
 import os
-from database import DatabaseManager
+from dotenv import load_dotenv
+from database_postgres import DatabaseManager
 from models import EquipmentStatus, InspectionResult
 from utils.helpers import format_date, parse_date
 from utils.validators import FormValidator
+
+# Load environment variables
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
