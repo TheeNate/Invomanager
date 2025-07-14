@@ -13,24 +13,12 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Equipment Inventory App"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "desktop_app_test"
+args = "Equipment Inventory Desktop"
 
 [[workflows.workflow]]
-name = "Equipment Inventory App"
+name = "Equipment Inventory Desktop"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
-
-[[workflows.workflow]]
-name = "desktop_app_test"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
+args = "DISPLAY=:1 python main.py"
