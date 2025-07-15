@@ -136,13 +136,13 @@ Equipment Inventory System
                     'Authorization': f'Bearer {resend_api_key}',
                     'Content-Type': 'application/json'
                 },
-                json={{
+                json={
                     'from': from_email,
                     'to': [email],
                     'subject': 'Equipment Inventory Login Link',
                     'html': html_body,
                     'text': text_body
-                }}
+                }
             )
             
             if response.status_code == 200:
