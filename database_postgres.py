@@ -32,18 +32,34 @@ class DatabaseManager:
         
     def connect(self):
         """Establish database connection"""
-        connection = psycopg2.connect(self.db_url)
-        connection.autocommit = False
-        return connection
+        try:
+            connection = psycopg2.connect(self.db_url)
+            connection.autocommit = False
+            return connection
+        except psycopg2.OperationalError as e:
+            print(f"Database connection failed: {str(e)}")
+            print(f"Connection URL (masked): {self.db_url[:20]}...")
+            raise
+        except Exception as e:
+            print(f"Unexpected database error: {str(e)}")
+            raise
     
     def initialize_database(self):
         """Create all tables and insert initial data"""
+        print("Connecting to PostgreSQL database...")
         conn = self.connect()
         try:
             cursor = conn.cursor()
+            print("Creating database tables...")
             self._create_tables(cursor)
+            print("Inserting default equipment types...")
             self._insert_default_equipment_types(cursor)
             conn.commit()
+            print("Database initialization completed successfully!")
+        except Exception as e:
+            print(f"Database initialization failed: {str(e)}")
+            conn.rollback()
+            raise
         finally:
             conn.close()
     

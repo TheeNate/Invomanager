@@ -24,12 +24,38 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-producti
 
 
 
-# Initialize database
-db_manager = DatabaseManager()
-db_manager.initialize_database()
+# Initialize database manager
+db_manager = None
+auth = None
 
-# Initialize authentication
-auth = MagicLinkAuth(db_manager)
+def initialize_app():
+    """Initialize database and authentication with proper error handling"""
+    global db_manager, auth
+    
+    try:
+        print("Initializing database connection...")
+        db_manager = DatabaseManager()
+        
+        print("Setting up database tables...")
+        db_manager.initialize_database()
+        
+        print("Initializing authentication system...")
+        auth = MagicLinkAuth(db_manager)
+        
+        print("Application initialization completed successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to initialize application: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+# Initialize the application
+if not initialize_app():
+    print("Application failed to start. Check database connection and environment variables.")
+    import sys
+    sys.exit(1)
 
 @app.route('/')
 @auth.require_auth

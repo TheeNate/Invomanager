@@ -36,3 +36,9 @@ def worker_int(worker):
 
 def pre_fork(server, worker):
     server.log.info("Worker spawned (pid: %s)", worker.pid)
+
+def on_starting(server):
+    server.log.info("Equipment Inventory Management System starting up...")
+
+def on_reload(server):
+    server.log.info("Worker reloaded")
