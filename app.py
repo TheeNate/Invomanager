@@ -208,7 +208,8 @@ def add_equipment():
             # Get common form data
             equipment_type = request.form.get('equipment_type')
             name = request.form.get('name', '').strip() or None
-            first_use_date = parse_date(request.form.get('first_use_date', '').strip())
+            date_added_to_inventory = parse_date(request.form.get('date_added_to_inventory', '').strip()) or date.today()
+            date_put_in_service = parse_date(request.form.get('date_put_in_service', '').strip())
             
             if batch_mode:
                 # Handle batch equipment creation
@@ -236,7 +237,7 @@ def add_equipment():
                     
                     # Validate each item
                     errors = FormValidator.validate_equipment_form(
-                        equipment_type, serial_number or '', first_use_date
+                        equipment_type, serial_number or '', date_added_to_inventory, date_put_in_service
                     )
                     
                     if errors:
@@ -249,7 +250,7 @@ def add_equipment():
                     
                     # Add individual equipment
                     equipment_id = db_manager.add_equipment(
-                        equipment_type, name, serial_number, first_use_date
+                        equipment_type, name, serial_number, date_added_to_inventory, date_put_in_service
                     )
                     created_equipment.append(equipment_id)
                 
@@ -262,7 +263,7 @@ def add_equipment():
                 
                 # Validate form
                 errors = FormValidator.validate_equipment_form(
-                    equipment_type, serial_number or '', first_use_date
+                    equipment_type, serial_number or '', date_added_to_inventory, date_put_in_service
                 )
                 
                 if errors:
@@ -275,7 +276,7 @@ def add_equipment():
                 
                 # Add equipment
                 equipment_id = db_manager.add_equipment(
-                    equipment_type, name, serial_number, first_use_date
+                    equipment_type, name, serial_number, date_added_to_inventory, date_put_in_service
                 )
                 
                 flash(f'Equipment {equipment_id} added successfully!', 'success')
@@ -330,6 +331,33 @@ def update_equipment_status(equipment_id):
     
     except Exception as e:
         flash(f'Error updating equipment status: {str(e)}', 'error')
+        return redirect(url_for('equipment_details', equipment_id=equipment_id))
+
+@app.route('/equipment/<path:equipment_id>/update_service_date', methods=['POST'])
+@auth.require_auth
+def update_equipment_service_date(equipment_id):
+    """Update equipment service date"""
+    try:
+        service_date_str = request.form.get('date_put_in_service')
+        
+        if not service_date_str:
+            flash('Service date is required', 'error')
+            return redirect(url_for('equipment_details', equipment_id=equipment_id))
+        
+        service_date = parse_date(service_date_str)
+        if not service_date:
+            flash('Invalid date format', 'error')
+            return redirect(url_for('equipment_details', equipment_id=equipment_id))
+        
+        if db_manager.update_equipment_service_date(equipment_id, service_date):
+            flash(f'Service date updated successfully for {equipment_id}', 'success')
+        else:
+            flash('Failed to update service date', 'error')
+        
+        return redirect(url_for('equipment_details', equipment_id=equipment_id))
+    
+    except Exception as e:
+        flash(f'Error updating service date: {str(e)}', 'error')
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/equipment/<path:equipment_id>/delete', methods=['POST'])

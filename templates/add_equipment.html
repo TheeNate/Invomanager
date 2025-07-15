@@ -59,11 +59,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="first_use_date" class="form-label">First Use Date</label>
-                        <input type="date" name="first_use_date" id="first_use_date" class="form-control"
-                               value="{{ form_data.first_use_date if form_data }}">
-                        <div class="form-text">Required for soft goods expiration tracking</div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="date_added_to_inventory" class="form-label">Date Added to Inventory</label>
+                                <input type="date" name="date_added_to_inventory" id="date_added_to_inventory" class="form-control"
+                                       value="{{ form_data.date_added_to_inventory if form_data else date.today().strftime('%Y-%m-%d') }}">
+                                <div class="form-text">Defaults to today if not specified</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="date_put_in_service" class="form-label">Date Put in Service</label>
+                                <input type="date" name="date_put_in_service" id="date_put_in_service" class="form-control"
+                                       value="{{ form_data.date_put_in_service if form_data }}">
+                                <div class="form-text">Optional - can be updated later</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="alert alert-info">
@@ -71,7 +83,7 @@
                         <strong>Business Rules:</strong>
                         <ul class="mb-0 mt-2">
                             <li>Equipment will be created with ACTIVE status</li>
-                            <li>Soft goods (ropes, harnesses) have 10-year expiration from first use</li>
+                            <li>Soft goods (ropes, harnesses) have 10-year expiration from date put in service</li>
                             <li>Hardware (descenders, devices) have unlimited lifespan</li>
                             <li>All equipment requires inspection every 6 months</li>
                             <li><strong>Batch Add:</strong> Create multiple items of the same type with individual serial numbers (2-50 items)</li>

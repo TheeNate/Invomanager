@@ -86,7 +86,8 @@ class DatabaseManager:
                 name VARCHAR(100),
                 status VARCHAR(20) DEFAULT 'ACTIVE',
                 serial_number VARCHAR(50),
-                first_use_date DATE,
+                date_added_to_inventory DATE DEFAULT CURRENT_DATE,
+                date_put_in_service DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (equipment_type) REFERENCES Equipment_Types(type_code)
             )
@@ -138,7 +139,7 @@ class DatabaseManager:
     
     # Equipment CRUD operations
     def add_equipment(self, equipment_type: str, name: str = None, serial_number: str = None, 
-                     first_use_date: date = None) -> str:
+                     date_added_to_inventory: date = None, date_put_in_service: date = None) -> str:
         """Add new equipment and return the generated ID"""
         conn = self.connect()
         try:
@@ -148,9 +149,9 @@ class DatabaseManager:
             equipment_id = self._generate_equipment_id(equipment_type)
             
             cursor.execute("""
-                INSERT INTO Equipment (equipment_id, equipment_type, name, serial_number, first_use_date)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (equipment_id, equipment_type, name, serial_number, first_use_date))
+                INSERT INTO Equipment (equipment_id, equipment_type, name, serial_number, date_added_to_inventory, date_put_in_service)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (equipment_id, equipment_type, name, serial_number, date_added_to_inventory, date_put_in_service))
             
             # Record initial status change
             cursor.execute("""
@@ -287,6 +288,27 @@ class DatabaseManager:
             
             conn.commit()
             return True
+        finally:
+            conn.close()
+
+    def update_equipment_service_date(self, equipment_id: str, date_put_in_service: date) -> bool:
+        """Update the date put in service for equipment"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE Equipment 
+                SET date_put_in_service = %s
+                WHERE equipment_id = %s
+            """, (date_put_in_service, equipment_id))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            print(f"Error updating equipment service date: {e}")
+            return False
         finally:
             conn.close()
     
@@ -515,7 +537,7 @@ class DatabaseManager:
             if table_name == "equipment_summary":
                 cursor.execute("""
                     SELECT e.equipment_id, e.equipment_type, et.description as type_description,
-                           e.serial_number, e.first_use_date, e.status,
+                           e.name, e.serial_number, e.date_added_to_inventory, e.date_put_in_service, e.status,
                            i.inspection_date as last_inspection_date, i.result as last_inspection_result
                     FROM Equipment e
                     JOIN Equipment_Types et ON e.equipment_type = et.type_code

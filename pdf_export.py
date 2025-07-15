@@ -118,12 +118,13 @@ class EquipmentPDFExporter:
             
             # Create table data
             table_data = [
-                ['Equipment ID', 'Name', 'Serial Number', 'Status', 'First Use Date', 'Last Inspection']
+                ['Equipment ID', 'Name', 'Serial Number', 'Status', 'Added to Inventory', 'Put in Service', 'Last Inspection']
             ]
             
             for item in sorted(items, key=lambda x: x.get('equipment_id', '')):
                 # Format dates
-                first_use_date = self._format_date(item.get('first_use_date'))
+                date_added = self._format_date(item.get('date_added_to_inventory'))
+                date_in_service = self._format_date(item.get('date_put_in_service'))
                 last_inspection = self._format_inspection_info(item.get('last_inspection'))
                 
                 table_data.append([
@@ -131,12 +132,13 @@ class EquipmentPDFExporter:
                     item.get('name', 'Not specified'),
                     item.get('serial_number', 'Not specified'),
                     self._format_status(item.get('status', 'Unknown')),
-                    first_use_date,
+                    date_added,
+                    date_in_service,
                     last_inspection
                 ])
             
             # Create and style table
-            table = Table(table_data, colWidths=[1.2*inch, 1.5*inch, 1.2*inch, 1*inch, 1*inch, 1.3*inch])
+            table = Table(table_data, colWidths=[1*inch, 1.2*inch, 1*inch, 0.8*inch, 0.9*inch, 0.9*inch, 1.2*inch])
             table.setStyle(TableStyle([
                 # Header row
                 ('BACKGROUND', (0, 0), (-1, 0), HexColor('#3498db')),

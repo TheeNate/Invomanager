@@ -67,12 +67,17 @@
                         {{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}
                     </dd>
                     
-                    <dt class="col-sm-5">First Use Date:</dt>
+                    <dt class="col-sm-5">Date Added to Inventory:</dt>
                     <dd class="col-sm-7">
-                        {{ equipment.first_use_date | date_format or '<em class="text-muted">Not specified</em>' | safe }}
-                        {% if equipment.is_soft_goods and equipment.first_use_date %}
+                        {{ equipment.date_added_to_inventory | date_format or '<em class="text-muted">Not specified</em>' | safe }}
+                    </dd>
+                    
+                    <dt class="col-sm-5">Date Put in Service:</dt>
+                    <dd class="col-sm-7">
+                        {{ equipment.date_put_in_service | date_format or '<em class="text-muted">Not yet in service</em>' | safe }}
+                        {% if equipment.is_soft_goods and equipment.date_put_in_service %}
                             <small class="text-muted d-block">
-                                Expires: {{ (equipment.first_use_date | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.first_use_date | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
+                                Expires: {{ (equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
                             </small>
                         {% endif %}
                     </dd>
@@ -82,6 +87,35 @@
                         <small class="text-muted">{{ equipment.created_at | date_format('%Y-%m-%d %H:%M') }}</small>
                     </dd>
                 </dl>
+            </div>
+        </div>
+
+        <!-- Service Date Management -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-check"></i> Service Date Management
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_equipment_service_date', equipment_id=equipment.equipment_id) }}">
+                    <div class="mb-3">
+                        <label for="date_put_in_service" class="form-label">Date Put in Service</label>
+                        <input type="date" name="date_put_in_service" id="date_put_in_service" 
+                               class="form-control" 
+                               value="{{ equipment.date_put_in_service | date_format if equipment.date_put_in_service }}">
+                        <div class="form-text">
+                            Set when equipment is actually put into active service.
+                            {% if equipment.is_soft_goods %}
+                                This date is used to calculate the 10-year expiration for soft goods.
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-calendar-check"></i> Update Service Date
+                    </button>
+                </form>
             </div>
         </div>
 

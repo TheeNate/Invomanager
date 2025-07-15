@@ -65,9 +65,13 @@ class EquipmentValidator:
         return True, ""
     
     @staticmethod
-    def validate_equipment_dates(first_use_date: Optional[date]) -> Tuple[bool, str]:
-        """Validate equipment date"""
-        # No specific date relationship validation needed now that purchase_date is removed
+    def validate_equipment_dates(date_added_to_inventory: Optional[date], 
+                               date_put_in_service: Optional[date]) -> Tuple[bool, str]:
+        """Validate equipment date relationships"""
+        if date_added_to_inventory and date_put_in_service:
+            if date_put_in_service < date_added_to_inventory:
+                return False, "Date put in service cannot be before date added to inventory"
+        
         return True, ""
 
 class InspectionValidator:
@@ -148,7 +152,8 @@ class FormValidator:
     
     @staticmethod
     def validate_equipment_form(equipment_type: str, serial_number: str,
-                               first_use_date: Optional[date]) -> List[str]:
+                               date_added_to_inventory: Optional[date],
+                               date_put_in_service: Optional[date]) -> List[str]:
         """Validate complete equipment form"""
         errors = []
         
@@ -163,12 +168,16 @@ class FormValidator:
             errors.append(msg)
         
         # Validate dates
-        valid, msg = EquipmentValidator.validate_date(first_use_date, "First use date")
+        valid, msg = EquipmentValidator.validate_date(date_added_to_inventory, "Date added to inventory")
+        if not valid:
+            errors.append(msg)
+            
+        valid, msg = EquipmentValidator.validate_date(date_put_in_service, "Date put in service")
         if not valid:
             errors.append(msg)
         
         # Validate date relationships
-        valid, msg = EquipmentValidator.validate_equipment_dates(first_use_date)
+        valid, msg = EquipmentValidator.validate_equipment_dates(date_added_to_inventory, date_put_in_service)
         if not valid:
             errors.append(msg)
         
