@@ -74,6 +74,9 @@
             <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-info">
                 <i class="bi bi-graph-up"></i> View Reports
             </a>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="showPutInServiceModal()">
+                <i class="bi bi-calendar-check"></i> Put in Service
+            </button>
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-file-earmark-pdf"></i> Export PDF
@@ -478,5 +481,96 @@ function exportSelectedItems() {
     form.submit();
     document.body.removeChild(form);
 }
+
+// Put in Service functionality
+function showPutInServiceModal() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one item to put in service.');
+        return;
+    }
+    
+    // Show the modal
+    new bootstrap.Modal(document.getElementById('putInServiceModal')).show();
+}
+
+function submitPutInService() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    const serviceDate = document.getElementById('bulkServiceDate').value;
+    
+    if (!serviceDate) {
+        alert('Please select a service date.');
+        return;
+    }
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('bulk_put_in_service') }}";
+    
+    // Add service date
+    const dateInput = document.createElement('input');
+    dateInput.type = 'hidden';
+    dateInput.name = 'service_date';
+    dateInput.value = serviceDate;
+    form.appendChild(dateInput);
+    
+    // Add selected equipment IDs as hidden inputs
+    selectedCheckboxes.forEach(checkbox => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_equipment';
+        input.value = checkbox.value;
+        form.appendChild(input);
+    });
+    
+    // Add CSRF token if available
+    const csrfToken = document.querySelector('input[name="csrf_token"]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = csrfToken.value;
+        form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
 </script>
+
+<!-- Put in Service Modal -->
+<div class="modal fade" id="putInServiceModal" tabindex="-1" aria-labelledby="putInServiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="putInServiceModalLabel">
+                    <i class="bi bi-calendar-check"></i> Put Equipment in Service
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Set the date when the selected equipment was put into active service.</p>
+                <div class="mb-3">
+                    <label for="bulkServiceDate" class="form-label">Date Put in Service</label>
+                    <input type="date" class="form-control" id="bulkServiceDate" required>
+                    <div class="form-text">This date will be applied to all selected equipment items.</div>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Note:</strong> For soft goods (ropes, harnesses), this date is used to calculate the 10-year expiration.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitPutInService()">
+                    <i class="bi bi-calendar-check"></i> Put in Service
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

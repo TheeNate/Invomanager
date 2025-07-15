@@ -671,6 +671,51 @@ def export_selected_equipment_pdf():
         flash(f'Error generating PDF: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+@app.route('/equipment/bulk_put_in_service', methods=['POST'])
+@auth.require_auth
+def bulk_put_in_service():
+    """Put multiple equipment items in service"""
+    try:
+        # Get selected equipment IDs and service date from form
+        selected_ids = request.form.getlist('selected_equipment')
+        service_date_str = request.form.get('service_date')
+        
+        if not selected_ids:
+            flash('No equipment selected', 'error')
+            return redirect(url_for('index'))
+        
+        if not service_date_str:
+            flash('Service date is required', 'error')
+            return redirect(url_for('index'))
+        
+        service_date = parse_date(service_date_str)
+        if not service_date:
+            flash('Invalid date format', 'error')
+            return redirect(url_for('index'))
+        
+        # Update service date for each selected equipment
+        success_count = 0
+        error_count = 0
+        
+        for equipment_id in selected_ids:
+            if db_manager.update_equipment_service_date(equipment_id, service_date):
+                success_count += 1
+            else:
+                error_count += 1
+        
+        # Show results
+        if success_count > 0:
+            flash(f'Successfully put {success_count} equipment item(s) in service', 'success')
+        
+        if error_count > 0:
+            flash(f'Failed to update {error_count} equipment item(s)', 'error')
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        flash(f'Error updating service dates: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
 if __name__ == '__main__':
     # Use production mode for deployment
     debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
