@@ -69,7 +69,7 @@ class MagicLinkAuth:
             print(f"From email: {from_email}")
             
             if not resend_api_key:
-                print("Resend API key not configured")
+                print("ERROR: Resend API key not configured")
                 return False
             
             # Email content
@@ -133,26 +133,43 @@ Equipment Inventory System
 """
             
             # Send email via Resend API
-            response = requests.post(
-                'https://api.resend.com/emails',
-                headers={
-                    'Authorization': f'Bearer {resend_api_key}',
-                    'Content-Type': 'application/json'
-                },
-                json={
-                    'from': from_email,
-                    'to': [email],
-                    'subject': 'Equipment Inventory Login Link',
-                    'html': html_body,
-                    'text': text_body
-                }
-            )
+            print("Making request to Resend API...")
+            payload = {
+                'from': from_email,
+                'to': [email],
+                'subject': 'Equipment Inventory Login Link',
+                'html': html_body,
+                'text': text_body
+            }
+            print(f"Request payload: {payload}")
             
-            if response.status_code == 200:
-                print(f"Magic link sent successfully to {email}")
-                return True
-            else:
-                print(f"Failed to send email: {response.status_code} - {response.text}")
+            try:
+                response = requests.post(
+                    'https://api.resend.com/emails',
+                    headers={
+                        'Authorization': f'Bearer {resend_api_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json=payload,
+                    timeout=30  # Add timeout
+                )
+                
+                print(f"Response status: {response.status_code}")
+                print(f"Response headers: {dict(response.headers)}")
+                print(f"Response body: {response.text}")
+                
+                if response.status_code == 200:
+                    print(f"Magic link sent successfully to {email}")
+                    return True
+                else:
+                    print(f"Failed to send email: {response.status_code} - {response.text}")
+                    return False
+                    
+            except requests.exceptions.Timeout:
+                print("ERROR: Request to Resend API timed out")
+                return False
+            except requests.exceptions.RequestException as req_e:
+                print(f"ERROR: Request exception: {req_e}")
                 return False
             
         except Exception as e:

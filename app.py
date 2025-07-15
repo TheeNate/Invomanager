@@ -92,13 +92,22 @@ def index():
 @app.route('/auth/login', methods=['GET', 'POST'])
 def auth_login():
     """Magic link login page"""
+    print(f"Login route accessed: {request.method}")
+    
     if auth.is_authenticated():
+        print("User already authenticated, redirecting to index")
         return redirect(url_for('index'))
     
     if request.method == 'POST':
+        print("POST request received")
+        print(f"Form data: {request.form}")
+        print(f"Content-Type: {request.content_type}")
+        
         email = request.form.get('email', '').strip().lower()
+        print(f"Email extracted: '{email}'")
         
         if not email:
+            print("No email provided")
             flash('Please enter your email address.', 'error')
             return render_template('auth/login.html')
         
@@ -110,7 +119,10 @@ def auth_login():
             
             # Send email
             print(f"Attempting to send email to {email}")
-            if auth.send_magic_link(email, magic_link):
+            email_result = auth.send_magic_link(email, magic_link)
+            print(f"Email send result: {email_result}")
+            
+            if email_result:
                 print(f"Email sent successfully to {email}")
                 return render_template('auth/check_email.html', email=email)
             else:
@@ -123,6 +135,7 @@ def auth_login():
             traceback.print_exc()
             flash('An error occurred. Please try again.', 'error')
     
+    print("Rendering login template")
     return render_template('auth/login.html')
 
 @app.route('/auth/verify')

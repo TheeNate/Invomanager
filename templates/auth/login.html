@@ -82,9 +82,22 @@
 
 {% block scripts %}
 <script>
-document.getElementById('login-btn').addEventListener('click', function() {
+document.getElementById('login-btn').addEventListener('click', function(e) {
+    console.log('Login button clicked');
     this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
     this.disabled = true;
+    
+    // Re-enable button after 30 seconds to prevent permanent lockout
+    setTimeout(() => {
+        this.innerHTML = '<i class="bi bi-send"></i> Send Login Link';
+        this.disabled = false;
+    }, 30000);
+});
+
+// Add form submission debugging
+document.querySelector('form').addEventListener('submit', function(e) {
+    console.log('Form submission started');
+    console.log('Form data:', new FormData(this));
 });
 </script>
 {% endblock %}
