@@ -98,6 +98,9 @@ Preferred communication style: Simple, everyday language.
 - **July 14, 2025**: Added Name column to equipment table between Equipment ID and Type
 - **July 14, 2025**: Enhanced search functionality to include equipment names
 - **July 14, 2025**: Updated all templates to display and input equipment names
+- **July 14, 2025**: Added batch equipment creation functionality (2-50 items with individual serial numbers)
+- **July 14, 2025**: Implemented collapsible equipment grouping by type prefix (C/001-300, D/001-75, etc.)
+- **July 14, 2025**: Added expand/collapse all functionality for better navigation of large inventories
 
 ### Future Scalability
 - Authentication system can be added for user management

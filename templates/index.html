@@ -64,9 +64,17 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">Equipment List ({{ equipment_list|length }} items)</h5>
-        <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-info">
-            <i class="bi bi-graph-up"></i> View Reports
-        </a>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="expand-all-btn">
+                <i class="bi bi-arrows-expand"></i> Expand All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="collapse-all-btn">
+                <i class="bi bi-arrows-collapse"></i> Collapse All
+            </button>
+            <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-graph-up"></i> View Reports
+            </a>
+        </div>
     </div>
     <div class="card-body p-0">
         {% if equipment_list %}
@@ -84,75 +92,8 @@
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for equipment in equipment_list %}
-                            <tr>
-                                <td>
-                                    <a href="{{ url_for('equipment_details', equipment_id=equipment.equipment_id) }}" 
-                                       class="text-decoration-none fw-bold">
-                                        {{ equipment.equipment_id }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <span class="fw-medium">{{ equipment.name or 'Not specified' }}</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ equipment.equipment_type }}</span>
-                                </td>
-                                <td>{{ equipment.type_description }}</td>
-                                <td>
-                                    <small class="text-muted">
-                                        {{ equipment.serial_number or 'Not specified' }}
-                                    </small>
-                                </td>
-                                <td>
-                                    <span class="badge bg-{{ equipment.status | status_color }} status-badge">
-                                        {% if equipment.status == 'ACTIVE' %}
-                                            <i class="bi bi-check-circle"></i> Active
-                                        {% elif equipment.status == 'RED_TAGGED' %}
-                                            <i class="bi bi-exclamation-triangle"></i> Red Tagged
-                                        {% elif equipment.status == 'DESTROYED' %}
-                                            <i class="bi bi-x-circle"></i> Destroyed
-                                        {% endif %}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if equipment.last_inspection %}
-                                        <small>
-                                            {{ equipment.last_inspection.inspection_date | date_format }}
-                                            <span class="badge bg-{{ equipment.last_inspection.result | result_color }} ms-1">
-                                                {{ equipment.last_inspection.result }}
-                                            </span>
-                                        </small>
-                                    {% else %}
-                                        <small class="text-warning">
-                                            <i class="bi bi-exclamation-triangle"></i> Never inspected
-                                        </small>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm btn-group-actions" role="group">
-                                        <a href="{{ url_for('equipment_details', equipment_id=equipment.equipment_id) }}" 
-                                           class="btn btn-outline-primary" title="View Details">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        {% if equipment.status == 'ACTIVE' %}
-                                            <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" 
-                                               class="btn btn-outline-success" title="Add Inspection">
-                                                <i class="bi bi-clipboard-check"></i>
-                                            </a>
-                                        {% endif %}
-                                        {% if not equipment.last_inspection %}
-                                            <button type="button" class="btn btn-outline-danger btn-sm" 
-                                                    onclick="deleteEquipment('{{ equipment.equipment_id }}')" 
-                                                    title="Delete Equipment">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
+                    <tbody id="equipment-table-body">
+                        <!-- Equipment will be populated by JavaScript -->
                     </tbody>
                 </table>
             </div>
@@ -214,6 +155,256 @@
 
 {% block scripts %}
 <script>
+// Equipment data from server
+const equipmentData = {{ equipment_list | tojson | safe }};
+
+// Group equipment by type
+function groupEquipmentByType(equipment) {
+    const groups = {};
+    
+    equipment.forEach(item => {
+        const type = item.equipment_type;
+        if (!groups[type]) {
+            groups[type] = [];
+        }
+        groups[type].push(item);
+    });
+    
+    return groups;
+}
+
+// Create collapsible group row
+function createGroupRow(type, items, typeDescription) {
+    const minId = Math.min(...items.map(item => parseInt(item.equipment_id.split('/')[1])));
+    const maxId = Math.max(...items.map(item => parseInt(item.equipment_id.split('/')[1])));
+    const idRange = minId === maxId ? `${type}/${minId.toString().padStart(3, '0')}` : `${type}/${minId.toString().padStart(3, '0')}-${maxId.toString().padStart(3, '0')}`;
+    
+    // Count status summary
+    const statusCounts = items.reduce((acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+    }, {});
+    
+    const statusSummary = Object.entries(statusCounts)
+        .map(([status, count]) => `${count} ${status.toLowerCase().replace('_', ' ')}`)
+        .join(', ');
+    
+    return `
+        <tr class="group-header bg-light" data-group="${type}" style="cursor: pointer;">
+            <td colspan="8">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-chevron-down group-icon me-2"></i>
+                        <strong>${idRange}</strong>
+                        <span class="badge bg-secondary ms-2">${type}</span>
+                        <span class="ms-2 text-muted">${typeDescription}</span>
+                        <small class="ms-3 text-muted">(${items.length} items: ${statusSummary})</small>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="event.stopPropagation(); expandGroup('${type}')">
+                            <i class="bi bi-arrows-expand"></i> Expand
+                        </button>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+// Create equipment row
+function createEquipmentRow(equipment) {
+    const statusColorMap = {
+        'ACTIVE': 'success',
+        'RED_TAGGED': 'warning',
+        'DESTROYED': 'danger'
+    };
+    
+    const statusIconMap = {
+        'ACTIVE': 'check-circle',
+        'RED_TAGGED': 'exclamation-triangle',
+        'DESTROYED': 'x-circle'
+    };
+    
+    const resultColorMap = {
+        'PASS': 'success',
+        'FAIL': 'danger'
+    };
+    
+    let inspectionHtml = '';
+    if (equipment.last_inspection) {
+        const inspectionDate = new Date(equipment.last_inspection.inspection_date).toLocaleDateString();
+        const resultColor = resultColorMap[equipment.last_inspection.result] || 'secondary';
+        inspectionHtml = `
+            <small>
+                ${inspectionDate}
+                <span class="badge bg-${resultColor} ms-1">
+                    ${equipment.last_inspection.result}
+                </span>
+            </small>
+        `;
+    } else {
+        inspectionHtml = `
+            <small class="text-warning">
+                <i class="bi bi-exclamation-triangle"></i> Never inspected
+            </small>
+        `;
+    }
+    
+    let actionsHtml = `
+        <div class="btn-group btn-group-sm btn-group-actions" role="group">
+            <a href="/equipment/${equipment.equipment_id}" class="btn btn-outline-primary" title="View Details">
+                <i class="bi bi-eye"></i>
+            </a>
+    `;
+    
+    if (equipment.status === 'ACTIVE') {
+        actionsHtml += `
+            <a href="/inspection/add/${equipment.equipment_id}" class="btn btn-outline-success" title="Add Inspection">
+                <i class="bi bi-clipboard-check"></i>
+            </a>
+        `;
+    }
+    
+    if (!equipment.last_inspection) {
+        actionsHtml += `
+            <button type="button" class="btn btn-outline-danger btn-sm" 
+                    onclick="deleteEquipment('${equipment.equipment_id}')" 
+                    title="Delete Equipment">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+    }
+    
+    actionsHtml += '</div>';
+    
+    return `
+        <tr class="equipment-row" data-group="${equipment.equipment_type}" style="display: none;">
+            <td>
+                <a href="/equipment/${equipment.equipment_id}" class="text-decoration-none fw-bold">
+                    ${equipment.equipment_id}
+                </a>
+            </td>
+            <td>
+                <span class="fw-medium">${equipment.name || 'Not specified'}</span>
+            </td>
+            <td>
+                <span class="badge bg-secondary">${equipment.equipment_type}</span>
+            </td>
+            <td>${equipment.type_description}</td>
+            <td>
+                <small class="text-muted">
+                    ${equipment.serial_number || 'Not specified'}
+                </small>
+            </td>
+            <td>
+                <span class="badge bg-${statusColorMap[equipment.status]} status-badge">
+                    <i class="bi bi-${statusIconMap[equipment.status]}"></i> ${equipment.status.replace('_', ' ').toLowerCase()}
+                </span>
+            </td>
+            <td>${inspectionHtml}</td>
+            <td>${actionsHtml}</td>
+        </tr>
+    `;
+}
+
+// Toggle group visibility
+function toggleGroup(type) {
+    const groupRows = document.querySelectorAll(`tr.equipment-row[data-group="${type}"]`);
+    const groupHeader = document.querySelector(`tr.group-header[data-group="${type}"]`);
+    const icon = groupHeader.querySelector('.group-icon');
+    
+    const isExpanded = groupRows[0].style.display !== 'none';
+    
+    groupRows.forEach(row => {
+        row.style.display = isExpanded ? 'none' : '';
+    });
+    
+    icon.className = isExpanded ? 'bi bi-chevron-right group-icon me-2' : 'bi bi-chevron-down group-icon me-2';
+}
+
+// Expand specific group
+function expandGroup(type) {
+    const groupRows = document.querySelectorAll(`tr.equipment-row[data-group="${type}"]`);
+    const groupHeader = document.querySelector(`tr.group-header[data-group="${type}"]`);
+    const icon = groupHeader.querySelector('.group-icon');
+    
+    groupRows.forEach(row => {
+        row.style.display = '';
+    });
+    
+    icon.className = 'bi bi-chevron-down group-icon me-2';
+}
+
+// Expand all groups
+function expandAllGroups() {
+    document.querySelectorAll('.equipment-row').forEach(row => {
+        row.style.display = '';
+    });
+    
+    document.querySelectorAll('.group-icon').forEach(icon => {
+        icon.className = 'bi bi-chevron-down group-icon me-2';
+    });
+}
+
+// Collapse all groups
+function collapseAllGroups() {
+    document.querySelectorAll('.equipment-row').forEach(row => {
+        row.style.display = 'none';
+    });
+    
+    document.querySelectorAll('.group-icon').forEach(icon => {
+        icon.className = 'bi bi-chevron-right group-icon me-2';
+    });
+}
+
+// Render equipment table
+function renderEquipmentTable() {
+    const tableBody = document.getElementById('equipment-table-body');
+    
+    if (!equipmentData || equipmentData.length === 0) {
+        return;
+    }
+    
+    const groups = groupEquipmentByType(equipmentData);
+    let html = '';
+    
+    // Sort groups by type code
+    const sortedTypes = Object.keys(groups).sort();
+    
+    sortedTypes.forEach(type => {
+        const items = groups[type];
+        const typeDescription = items[0].type_description;
+        
+        // Add group header
+        html += createGroupRow(type, items, typeDescription);
+        
+        // Add equipment rows (sorted by equipment_id)
+        items.sort((a, b) => a.equipment_id.localeCompare(b.equipment_id))
+             .forEach(equipment => {
+                 html += createEquipmentRow(equipment);
+             });
+    });
+    
+    tableBody.innerHTML = html;
+    
+    // Add click handlers for group headers
+    document.querySelectorAll('.group-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const type = this.dataset.group;
+            toggleGroup(type);
+        });
+    });
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    renderEquipmentTable();
+    
+    // Add button handlers
+    document.getElementById('expand-all-btn').addEventListener('click', expandAllGroups);
+    document.getElementById('collapse-all-btn').addEventListener('click', collapseAllGroups);
+});
+
 function deleteEquipment(equipmentId) {
     document.getElementById('deleteEquipmentId').textContent = equipmentId;
     document.getElementById('deleteEquipmentForm').action = '/equipment/' + equipmentId + '/delete';
