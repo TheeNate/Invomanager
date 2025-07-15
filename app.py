@@ -21,9 +21,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Set Resend API key if not already set
-if not os.environ.get('RESEND_API_KEY'):
-    os.environ['RESEND_API_KEY'] = 're_Quuj1MhU_Cf5a4KmXZi6Cqt9izxT1WXzF'
+
 
 # Initialize database
 db_manager = DatabaseManager()
