@@ -217,6 +217,63 @@ class DatabaseManager:
             return [dict(row) for row in cursor.fetchall()]
         finally:
             conn.close()
+
+    def get_equipment_list_with_inspections(self, status_filter: str = None, type_filter: str = None) -> List[Dict]:
+        """Get equipment list with last inspection data in a single optimized query"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            query = """
+                SELECT e.*, et.description as type_description,
+                       li.inspection_date as last_inspection_date,
+                       li.result as last_inspection_result,
+                       li.inspector_name as last_inspector_name,
+                       li.notes as last_inspection_notes
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                LEFT JOIN (
+                    SELECT DISTINCT ON (equipment_id) 
+                           equipment_id, inspection_date, result, inspector_name, notes
+                    FROM Inspections 
+                    ORDER BY equipment_id, inspection_date DESC
+                ) li ON e.equipment_id = li.equipment_id
+                WHERE 1=1
+            """
+            params = []
+            
+            if status_filter:
+                query += " AND e.status = %s"
+                params.append(status_filter)
+            
+            if type_filter:
+                query += " AND e.equipment_type = %s"
+                params.append(type_filter)
+            
+            query += " ORDER BY e.equipment_type, e.equipment_id"
+            
+            cursor.execute(query, params)
+            equipment_list = [dict(row) for row in cursor.fetchall()]
+            
+            # Convert last inspection data to nested dict format for compatibility
+            for equipment in equipment_list:
+                if equipment['last_inspection_date']:
+                    equipment['last_inspection'] = {
+                        'inspection_date': equipment['last_inspection_date'],
+                        'result': equipment['last_inspection_result'],
+                        'inspector_name': equipment['last_inspector_name'],
+                        'notes': equipment['last_inspection_notes']
+                    }
+                else:
+                    equipment['last_inspection'] = None
+                
+                # Remove the flattened fields to maintain clean structure
+                for key in ['last_inspection_date', 'last_inspection_result', 'last_inspector_name', 'last_inspection_notes']:
+                    equipment.pop(key, None)
+            
+            return equipment_list
+        finally:
+            conn.close()
     
     def delete_equipment(self, equipment_id: str) -> bool:
         """Delete equipment entry (only if no inspections exist)"""

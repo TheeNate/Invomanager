@@ -1,3 +1,4 @@
+python
 #!/usr/bin/env python3
 """
 Equipment Inventory Management System - Web Application
@@ -604,13 +605,8 @@ def result_color_filter(result):
 def export_complete_inventory_pdf():
     """Export complete inventory as PDF"""
     try:
-        # Get all equipment
-        equipment_list = db_manager.get_equipment_list()
-
-        # Add last inspection data
-        for equipment in equipment_list:
-            last_inspection = db_manager.get_last_inspection(equipment['equipment_id'])
-            equipment['last_inspection'] = last_inspection
+        # Get all equipment with inspection data optimized
+        equipment_list = db_manager.get_equipment_list_with_inspections()
 
         # Generate PDF
         pdf_exporter = EquipmentPDFExporter()
@@ -642,13 +638,8 @@ def export_selected_equipment_pdf():
             flash('No equipment selected for export', 'error')
             return redirect(url_for('index'))
 
-        # Get all equipment
-        equipment_list = db_manager.get_equipment_list()
-
-        # Add last inspection data
-        for equipment in equipment_list:
-            last_inspection = db_manager.get_last_inspection(equipment['equipment_id'])
-            equipment['last_inspection'] = last_inspection
+        # Get all equipment with inspection data optimized
+        equipment_list = db_manager.get_equipment_list_with_inspections()
 
         # Generate PDF
         pdf_exporter = EquipmentPDFExporter()
