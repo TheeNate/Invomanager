@@ -13,10 +13,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Equipment Inventory Web App"
+args = "Flask Server"
 
 [[workflows.workflow]]
-name = "Equipment Inventory Web App"
+name = "Flask Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
