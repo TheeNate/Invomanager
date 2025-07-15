@@ -65,13 +65,9 @@ class EquipmentValidator:
         return True, ""
     
     @staticmethod
-    def validate_equipment_dates(purchase_date: Optional[date], 
-                               first_use_date: Optional[date]) -> Tuple[bool, str]:
-        """Validate equipment date relationships"""
-        if purchase_date and first_use_date:
-            if first_use_date < purchase_date:
-                return False, "First use date cannot be before purchase date"
-        
+    def validate_equipment_dates(first_use_date: Optional[date]) -> Tuple[bool, str]:
+        """Validate equipment date"""
+        # No specific date relationship validation needed now that purchase_date is removed
         return True, ""
 
 class InspectionValidator:
@@ -152,7 +148,6 @@ class FormValidator:
     
     @staticmethod
     def validate_equipment_form(equipment_type: str, serial_number: str,
-                               purchase_date: Optional[date], 
                                first_use_date: Optional[date]) -> List[str]:
         """Validate complete equipment form"""
         errors = []
@@ -168,16 +163,12 @@ class FormValidator:
             errors.append(msg)
         
         # Validate dates
-        valid, msg = EquipmentValidator.validate_date(purchase_date, "Purchase date")
-        if not valid:
-            errors.append(msg)
-        
         valid, msg = EquipmentValidator.validate_date(first_use_date, "First use date")
         if not valid:
             errors.append(msg)
         
         # Validate date relationships
-        valid, msg = EquipmentValidator.validate_equipment_dates(purchase_date, first_use_date)
+        valid, msg = EquipmentValidator.validate_equipment_dates(first_use_date)
         if not valid:
             errors.append(msg)
         

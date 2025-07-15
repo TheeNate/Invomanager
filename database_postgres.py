@@ -86,7 +86,6 @@ class DatabaseManager:
                 name VARCHAR(100),
                 status VARCHAR(20) DEFAULT 'ACTIVE',
                 serial_number VARCHAR(50),
-                purchase_date DATE,
                 first_use_date DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (equipment_type) REFERENCES Equipment_Types(type_code)
@@ -139,7 +138,7 @@ class DatabaseManager:
     
     # Equipment CRUD operations
     def add_equipment(self, equipment_type: str, name: str = None, serial_number: str = None, 
-                     purchase_date: date = None, first_use_date: date = None) -> str:
+                     first_use_date: date = None) -> str:
         """Add new equipment and return the generated ID"""
         conn = self.connect()
         try:
@@ -149,9 +148,9 @@ class DatabaseManager:
             equipment_id = self._generate_equipment_id(equipment_type)
             
             cursor.execute("""
-                INSERT INTO Equipment (equipment_id, equipment_type, name, serial_number, purchase_date, first_use_date)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (equipment_id, equipment_type, name, serial_number, purchase_date, first_use_date))
+                INSERT INTO Equipment (equipment_id, equipment_type, name, serial_number, first_use_date)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (equipment_id, equipment_type, name, serial_number, first_use_date))
             
             # Record initial status change
             cursor.execute("""
@@ -516,7 +515,7 @@ class DatabaseManager:
             if table_name == "equipment_summary":
                 cursor.execute("""
                     SELECT e.equipment_id, e.equipment_type, et.description as type_description,
-                           e.serial_number, e.purchase_date, e.first_use_date, e.status,
+                           e.serial_number, e.first_use_date, e.status,
                            i.inspection_date as last_inspection_date, i.result as last_inspection_result
                     FROM Equipment e
                     JOIN Equipment_Types et ON e.equipment_type = et.type_code

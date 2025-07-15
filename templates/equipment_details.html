@@ -67,11 +67,6 @@
                         {{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}
                     </dd>
                     
-                    <dt class="col-sm-5">Purchase Date:</dt>
-                    <dd class="col-sm-7">
-                        {{ equipment.purchase_date | date_format or '<em class="text-muted">Not specified</em>' | safe }}
-                    </dd>
-                    
                     <dt class="col-sm-5">First Use Date:</dt>
                     <dd class="col-sm-7">
                         {{ equipment.first_use_date | date_format or '<em class="text-muted">Not specified</em>' | safe }}

@@ -4,7 +4,7 @@ Equipment Inventory Management System - Web Application
 Flask-based web interface for safety equipment tracking
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, Response
 from datetime import date, datetime
 import os
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ from auth import MagicLinkAuth
 from models import EquipmentStatus, InspectionResult
 from utils.helpers import format_date, parse_date
 from utils.validators import FormValidator
+from pdf_export import EquipmentPDFExporter
 
 # Load environment variables
 load_dotenv()
@@ -207,7 +208,6 @@ def add_equipment():
             # Get common form data
             equipment_type = request.form.get('equipment_type')
             name = request.form.get('name', '').strip() or None
-            purchase_date = parse_date(request.form.get('purchase_date', '').strip())
             first_use_date = parse_date(request.form.get('first_use_date', '').strip())
             
             if batch_mode:
@@ -236,7 +236,7 @@ def add_equipment():
                     
                     # Validate each item
                     errors = FormValidator.validate_equipment_form(
-                        equipment_type, serial_number or '', purchase_date, first_use_date
+                        equipment_type, serial_number or '', first_use_date
                     )
                     
                     if errors:
@@ -249,7 +249,7 @@ def add_equipment():
                     
                     # Add individual equipment
                     equipment_id = db_manager.add_equipment(
-                        equipment_type, name, serial_number, purchase_date, first_use_date
+                        equipment_type, name, serial_number, first_use_date
                     )
                     created_equipment.append(equipment_id)
                 
@@ -262,7 +262,7 @@ def add_equipment():
                 
                 # Validate form
                 errors = FormValidator.validate_equipment_form(
-                    equipment_type, serial_number or '', purchase_date, first_use_date
+                    equipment_type, serial_number or '', first_use_date
                 )
                 
                 if errors:
@@ -275,7 +275,7 @@ def add_equipment():
                 
                 # Add equipment
                 equipment_id = db_manager.add_equipment(
-                    equipment_type, name, serial_number, purchase_date, first_use_date
+                    equipment_type, name, serial_number, first_use_date
                 )
                 
                 flash(f'Equipment {equipment_id} added successfully!', 'success')
@@ -569,6 +569,79 @@ def result_color_filter(result):
         'FAIL': 'danger'
     }
     return colors.get(result, 'dark')
+
+@app.route('/export/pdf/complete')
+@auth.require_auth
+def export_complete_inventory_pdf():
+    """Export complete inventory as PDF"""
+    try:
+        # Get all equipment
+        equipment_list = db_manager.get_equipment_list()
+        
+        # Add last inspection data
+        for equipment in equipment_list:
+            last_inspection = db_manager.get_last_inspection(equipment['equipment_id'])
+            equipment['last_inspection'] = last_inspection
+        
+        # Generate PDF
+        pdf_exporter = EquipmentPDFExporter()
+        pdf_bytes = pdf_exporter.create_complete_inventory_pdf(equipment_list)
+        
+        # Create response
+        response = Response(
+            pdf_bytes,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename=equipment_inventory_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+            }
+        )
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/export/pdf/selected', methods=['POST'])
+@auth.require_auth
+def export_selected_equipment_pdf():
+    """Export selected equipment as PDF"""
+    try:
+        # Get selected equipment IDs from form
+        selected_ids = request.form.getlist('selected_equipment')
+        
+        if not selected_ids:
+            flash('No equipment selected for export', 'error')
+            return redirect(url_for('index'))
+        
+        # Get all equipment
+        equipment_list = db_manager.get_equipment_list()
+        
+        # Add last inspection data
+        for equipment in equipment_list:
+            last_inspection = db_manager.get_last_inspection(equipment['equipment_id'])
+            equipment['last_inspection'] = last_inspection
+        
+        # Generate PDF
+        pdf_exporter = EquipmentPDFExporter()
+        pdf_bytes = pdf_exporter.create_selected_equipment_pdf(
+            equipment_list, 
+            selected_ids,
+            f"Selected Equipment Report ({len(selected_ids)} items)"
+        )
+        
+        # Create response
+        response = Response(
+            pdf_bytes,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename=selected_equipment_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+            }
+        )
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     # Use production mode for deployment

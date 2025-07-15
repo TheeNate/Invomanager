@@ -74,6 +74,19 @@
             <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-info">
                 <i class="bi bi-graph-up"></i> View Reports
             </a>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_complete_inventory_pdf') }}">
+                        <i class="bi bi-file-earmark-pdf"></i> Complete Inventory
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportSelectedItems()">
+                        <i class="bi bi-file-earmark-pdf"></i> Selected Items
+                    </a></li>
+                </ul>
+            </div>
         </div>
     </div>
     <div class="card-body p-0">
@@ -82,6 +95,9 @@
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
+                            <th>
+                                <input type="checkbox" id="select-all" class="form-check-input" title="Select all">
+                            </th>
                             <th>Equipment ID</th>
                             <th>Name</th>
                             <th>Type</th>
@@ -191,7 +207,7 @@ function createGroupRow(type, items, typeDescription) {
     
     return `
         <tr class="group-header bg-light" data-group="${type}" style="cursor: pointer;">
-            <td colspan="8">
+            <td colspan="9">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <i class="bi bi-chevron-down group-icon me-2"></i>
@@ -282,6 +298,9 @@ function createEquipmentRow(equipment) {
     
     return `
         <tr class="equipment-row" data-group="${equipment.equipment_type}" style="display: none;">
+            <td>
+                <input type="checkbox" class="form-check-input equipment-checkbox" value="${equipment.equipment_id}">
+            </td>
             <td>
                 <a href="${equipmentDetailsUrl}" class="text-decoration-none fw-bold">
                     ${equipment.equipment_id}
@@ -406,12 +425,58 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add button handlers
     document.getElementById('expand-all-btn').addEventListener('click', expandAllGroups);
     document.getElementById('collapse-all-btn').addEventListener('click', collapseAllGroups);
+    
+    // Select all checkbox functionality
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.equipment-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
 });
 
 function deleteEquipment(equipmentId) {
     document.getElementById('deleteEquipmentId').textContent = equipmentId;
     document.getElementById('deleteEquipmentForm').action = '/equipment/' + equipmentId + '/delete';
     new bootstrap.Modal(document.getElementById('deleteEquipmentModal')).show();
+}
+
+// PDF Export functionality
+function exportSelectedItems() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one item to export.');
+        return;
+    }
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('export_selected_equipment_pdf') }}";
+    
+    // Add selected equipment IDs as hidden inputs
+    selectedCheckboxes.forEach(checkbox => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_equipment';
+        input.value = checkbox.value;
+        form.appendChild(input);
+    });
+    
+    // Add CSRF token if available
+    const csrfToken = document.querySelector('input[name="csrf_token"]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = csrfToken.value;
+        form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 </script>
 {% endblock %}

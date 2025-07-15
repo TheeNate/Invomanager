@@ -59,22 +59,11 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="purchase_date" class="form-label">Purchase Date</label>
-                                <input type="date" name="purchase_date" id="purchase_date" class="form-control"
-                                       value="{{ form_data.purchase_date if form_data }}">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="first_use_date" class="form-label">First Use Date</label>
-                                <input type="date" name="first_use_date" id="first_use_date" class="form-control"
-                                       value="{{ form_data.first_use_date if form_data }}">
-                                <div class="form-text">Required for soft goods expiration tracking</div>
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label for="first_use_date" class="form-label">First Use Date</label>
+                        <input type="date" name="first_use_date" id="first_use_date" class="form-control"
+                               value="{{ form_data.first_use_date if form_data }}">
+                        <div class="form-text">Required for soft goods expiration tracking</div>
                     </div>
 
                     <div class="alert alert-info">
