@@ -489,6 +489,24 @@ def api_equipment_details(equipment_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    try:
+        # Test database connection
+        db_manager.get_equipment_types()
+        return jsonify({
+            'status': 'healthy',
+            'service': 'Equipment Inventory Management System',
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 503
+
 # Template context processor to make auth available in templates
 @app.context_processor
 def inject_auth():
@@ -529,4 +547,5 @@ def result_color_filter(result):
 if __name__ == '__main__':
     # Use production mode for deployment
     debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
