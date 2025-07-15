@@ -127,7 +127,7 @@ def auth_login():
                 return render_template('auth/check_email.html', email=email)
             else:
                 print(f"Failed to send email to {email}")
-                flash('Failed to send email. Please try again or contact your administrator.', 'error')
+                flash('Failed to send email. Please try a real email address (test domains like example.com are not allowed).', 'error')
                 
         except Exception as e:
             print(f"Login error: {e}")
