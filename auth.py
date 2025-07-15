@@ -3,12 +3,10 @@ Magic Link Authentication System
 Simple email-based authentication for single shared inventory
 """
 import os
-import smtplib
+import requests
 import secrets
 import hashlib
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from flask import session, request, url_for
 from typing import Optional
 
@@ -61,27 +59,62 @@ class MagicLinkAuth:
         return magic_link
     
     def send_magic_link(self, email: str, magic_link: str) -> bool:
-        """Send magic link via email"""
+        """Send magic link via Resend API"""
         try:
-            # Email configuration from environment variables
-            smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-            smtp_port = int(os.environ.get('SMTP_PORT', '587'))
-            smtp_username = os.environ.get('SMTP_USERNAME')
-            smtp_password = os.environ.get('SMTP_PASSWORD')
-            from_email = os.environ.get('FROM_EMAIL', smtp_username)
+            # Get Resend API key from environment
+            resend_api_key = os.environ.get('RESEND_API_KEY')
+            from_email = os.environ.get('FROM_EMAIL', 'Equipment Inventory <noreply@yourdomain.com>')
             
-            if not smtp_username or not smtp_password:
-                print("SMTP credentials not configured")
+            if not resend_api_key:
+                print("Resend API key not configured")
                 return False
             
-            # Create email message
-            msg = MIMEMultipart()
-            msg['From'] = from_email
-            msg['To'] = email
-            msg['Subject'] = "Equipment Inventory Login Link"
+            # Email content
+            html_body = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+                    .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
+                    .login-button {{ display: inline-block; background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                    .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>🔧 Equipment Inventory Access</h2>
+                    </div>
+                    <div class="content">
+                        <h3>Secure Login Link</h3>
+                        <p>Hello,</p>
+                        <p>Click the button below to securely access your Equipment Inventory System:</p>
+                        
+                        <p style="text-align: center;">
+                            <a href="{magic_link}" class="login-button">Access Equipment Inventory</a>
+                        </p>
+                        
+                        <p><strong>Important:</strong> This link will expire in {self.token_expiry_hours} hour(s) for security.</p>
+                        
+                        <p>If you didn't request this login, you can safely ignore this email.</p>
+                        
+                        <div class="footer">
+                            <p>Equipment Inventory Management System<br>
+                            Safety Equipment Tracking & Compliance</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
             
-            # Email body
-            body = f"""
+            text_body = f"""
+Equipment Inventory Login Link
+
 Hello,
 
 Click the link below to access the Equipment Inventory System:
@@ -96,20 +129,31 @@ Best regards,
 Equipment Inventory System
 """
             
-            msg.attach(MIMEText(body, 'plain'))
+            # Send email via Resend API
+            response = requests.post(
+                'https://api.resend.com/emails',
+                headers={
+                    'Authorization': f'Bearer {resend_api_key}',
+                    'Content-Type': 'application/json'
+                },
+                json={{
+                    'from': from_email,
+                    'to': [email],
+                    'subject': 'Equipment Inventory Login Link',
+                    'html': html_body,
+                    'text': text_body
+                }}
+            )
             
-            # Send email
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.starttls()
-            server.login(smtp_username, smtp_password)
-            text = msg.as_string()
-            server.sendmail(from_email, email, text)
-            server.quit()
-            
-            return True
+            if response.status_code == 200:
+                print(f"Magic link sent successfully to {email}")
+                return True
+            else:
+                print(f"Failed to send email: {response.status_code} - {response.text}")
+                return False
             
         except Exception as e:
-            print(f"Error sending email: {e}")
+            print(f"Error sending email via Resend: {e}")
             return False
     
     def verify_magic_link(self, token: str) -> Optional[str]:
