@@ -250,16 +250,19 @@ function createEquipmentRow(equipment) {
         `;
     }
     
+    const equipmentDetailsUrl = "{{ url_for('equipment_details', equipment_id='EQUIPMENT_ID_PLACEHOLDER') }}".replace('EQUIPMENT_ID_PLACEHOLDER', equipment.equipment_id);
+    const addInspectionUrl = "{{ url_for('add_inspection', equipment_id='EQUIPMENT_ID_PLACEHOLDER') }}".replace('EQUIPMENT_ID_PLACEHOLDER', equipment.equipment_id);
+    
     let actionsHtml = `
         <div class="btn-group btn-group-sm btn-group-actions" role="group">
-            <a href="/equipment/${equipment.equipment_id}" class="btn btn-outline-primary" title="View Details">
+            <a href="${equipmentDetailsUrl}" class="btn btn-outline-primary" title="View Details">
                 <i class="bi bi-eye"></i>
             </a>
     `;
     
     if (equipment.status === 'ACTIVE') {
         actionsHtml += `
-            <a href="/inspection/add/${equipment.equipment_id}" class="btn btn-outline-success" title="Add Inspection">
+            <a href="${addInspectionUrl}" class="btn btn-outline-success" title="Add Inspection">
                 <i class="bi bi-clipboard-check"></i>
             </a>
         `;
@@ -280,7 +283,7 @@ function createEquipmentRow(equipment) {
     return `
         <tr class="equipment-row" data-group="${equipment.equipment_type}" style="display: none;">
             <td>
-                <a href="/equipment/${equipment.equipment_id}" class="text-decoration-none fw-bold">
+                <a href="${equipmentDetailsUrl}" class="text-decoration-none fw-bold">
                     ${equipment.equipment_id}
                 </a>
             </td>

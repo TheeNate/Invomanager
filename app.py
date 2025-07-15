@@ -288,7 +288,7 @@ def add_equipment():
     equipment_types = db_manager.get_equipment_types()
     return render_template('add_equipment.html', equipment_types=equipment_types)
 
-@app.route('/equipment/<equipment_id>')
+@app.route('/equipment/<path:equipment_id>')
 @auth.require_auth
 def equipment_details(equipment_id):
     """Show equipment details"""
@@ -308,7 +308,7 @@ def equipment_details(equipment_id):
         flash(f'Error loading equipment details: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/equipment/<equipment_id>/update_status', methods=['POST'])
+@app.route('/equipment/<path:equipment_id>/update_status', methods=['POST'])
 @auth.require_auth
 def update_equipment_status(equipment_id):
     """Update equipment status"""
@@ -332,7 +332,7 @@ def update_equipment_status(equipment_id):
         flash(f'Error updating equipment status: {str(e)}', 'error')
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
-@app.route('/equipment/<equipment_id>/delete', methods=['POST'])
+@app.route('/equipment/<path:equipment_id>/delete', methods=['POST'])
 @auth.require_auth
 def delete_equipment(equipment_id):
     """Delete equipment entry"""
@@ -364,7 +364,7 @@ def delete_equipment(equipment_id):
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/inspection/add', methods=['GET', 'POST'])
-@app.route('/inspection/add/<equipment_id>', methods=['GET', 'POST'])
+@app.route('/inspection/add/<path:equipment_id>', methods=['GET', 'POST'])
 @auth.require_auth
 def add_inspection(equipment_id=None):
     """Add inspection record"""
@@ -496,7 +496,7 @@ def reports():
                              expiring_equipment=[],
                              stats={'total': 0, 'active': 0, 'red_tagged': 0, 'destroyed': 0})
 
-@app.route('/api/equipment/<equipment_id>')
+@app.route('/api/equipment/<path:equipment_id>')
 @auth.require_auth
 def api_equipment_details(equipment_id):
     """API endpoint for equipment details"""
