@@ -65,6 +65,9 @@ class MagicLinkAuth:
             resend_api_key = os.environ.get('RESEND_API_KEY')
             from_email = os.environ.get('FROM_EMAIL', 'Equipment Inventory <noreply@yourdomain.com>')
             
+            print(f"Resend API key available: {bool(resend_api_key)}")
+            print(f"From email: {from_email}")
+            
             if not resend_api_key:
                 print("Resend API key not configured")
                 return False

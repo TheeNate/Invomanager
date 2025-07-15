@@ -21,9 +21,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Temporarily set Resend API key for testing
-if not os.environ.get('RESEND_API_KEY'):
-    os.environ['RESEND_API_KEY'] = 're_Quuj1MhU_Cf5a4KmXZi6Cqt9izxT1WXzF'
+
 
 
 # Initialize database
@@ -106,16 +104,23 @@ def auth_login():
         
         try:
             # Generate magic link
+            print(f"Generating magic link for {email}")
             magic_link = auth.generate_magic_link(email)
+            print(f"Magic link generated: {magic_link}")
             
             # Send email
+            print(f"Attempting to send email to {email}")
             if auth.send_magic_link(email, magic_link):
+                print(f"Email sent successfully to {email}")
                 return render_template('auth/check_email.html', email=email)
             else:
+                print(f"Failed to send email to {email}")
                 flash('Failed to send email. Please try again or contact your administrator.', 'error')
                 
         except Exception as e:
             print(f"Login error: {e}")
+            import traceback
+            traceback.print_exc()
             flash('An error occurred. Please try again.', 'error')
     
     return render_template('auth/login.html')
