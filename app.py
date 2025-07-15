@@ -1,4 +1,3 @@
-python
 #!/usr/bin/env python3
 """
 Equipment Inventory Management System - Web Application
