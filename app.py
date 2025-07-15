@@ -527,4 +527,6 @@ def result_color_filter(result):
     return colors.get(result, 'dark')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use production mode for deployment
+    debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
