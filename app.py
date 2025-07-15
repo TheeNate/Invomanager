@@ -4,11 +4,12 @@ Equipment Inventory Management System - Web Application
 Flask-based web interface for safety equipment tracking
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import date, datetime
 import os
 from dotenv import load_dotenv
 from database_postgres import DatabaseManager
+from auth import MagicLinkAuth
 from models import EquipmentStatus, InspectionResult
 from utils.helpers import format_date, parse_date
 from utils.validators import FormValidator
@@ -24,7 +25,11 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-producti
 db_manager = DatabaseManager()
 db_manager.initialize_database()
 
+# Initialize authentication
+auth = MagicLinkAuth(db_manager)
+
 @app.route('/')
+@auth.require_auth
 def index():
     """Main dashboard page"""
     try:
@@ -81,7 +86,68 @@ def index():
                                  'search': ''
                              })
 
+@app.route('/auth/login', methods=['GET', 'POST'])
+def auth_login():
+    """Magic link login page"""
+    if auth.is_authenticated():
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        
+        if not email:
+            flash('Please enter your email address.', 'error')
+            return render_template('auth/login.html')
+        
+        try:
+            # Generate magic link
+            magic_link = auth.generate_magic_link(email)
+            
+            # Send email
+            if auth.send_magic_link(email, magic_link):
+                return render_template('auth/check_email.html', email=email)
+            else:
+                flash('Failed to send email. Please try again or contact your administrator.', 'error')
+                
+        except Exception as e:
+            print(f"Login error: {e}")
+            flash('An error occurred. Please try again.', 'error')
+    
+    return render_template('auth/login.html')
+
+@app.route('/auth/verify')
+def auth_verify():
+    """Verify magic link token"""
+    token = request.args.get('token')
+    
+    if not token:
+        flash('Invalid or missing login token.', 'error')
+        return redirect(url_for('auth_login'))
+    
+    # Verify token
+    email = auth.verify_magic_link(token)
+    
+    if email:
+        # Log in user
+        auth.login_user(email)
+        
+        # Redirect to originally requested page or home
+        next_url = session.pop('next_url', None)
+        flash(f'Welcome! You are now logged in as {email}', 'success')
+        return redirect(next_url or url_for('index'))
+    else:
+        flash('Invalid or expired login link. Please request a new one.', 'error')
+        return redirect(url_for('auth_login'))
+
+@app.route('/auth/logout')
+def auth_logout():
+    """Logout user"""
+    auth.logout_user()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('auth_login'))
+
 @app.route('/equipment/add', methods=['GET', 'POST'])
+@auth.require_auth
 def add_equipment():
     """Add new equipment"""
     if request.method == 'POST':
@@ -174,6 +240,7 @@ def add_equipment():
     return render_template('add_equipment.html', equipment_types=equipment_types)
 
 @app.route('/equipment/<equipment_id>')
+@auth.require_auth
 def equipment_details(equipment_id):
     """Show equipment details"""
     try:
@@ -193,6 +260,7 @@ def equipment_details(equipment_id):
         return redirect(url_for('index'))
 
 @app.route('/equipment/<equipment_id>/update_status', methods=['POST'])
+@auth.require_auth
 def update_equipment_status(equipment_id):
     """Update equipment status"""
     try:
@@ -216,6 +284,7 @@ def update_equipment_status(equipment_id):
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/equipment/<equipment_id>/delete', methods=['POST'])
+@auth.require_auth
 def delete_equipment(equipment_id):
     """Delete equipment entry"""
     try:
@@ -247,6 +316,7 @@ def delete_equipment(equipment_id):
 
 @app.route('/inspection/add', methods=['GET', 'POST'])
 @app.route('/inspection/add/<equipment_id>', methods=['GET', 'POST'])
+@auth.require_auth
 def add_inspection(equipment_id=None):
     """Add inspection record"""
     if request.method == 'POST':
@@ -295,6 +365,7 @@ def add_inspection(equipment_id=None):
                          today=date.today().strftime('%Y-%m-%d'))
 
 @app.route('/equipment-types')
+@auth.require_auth
 def equipment_types():
     """Manage equipment types"""
     try:
@@ -306,6 +377,7 @@ def equipment_types():
         return render_template('equipment_types.html', equipment_types=[])
 
 @app.route('/equipment-types/add', methods=['POST'])
+@auth.require_auth
 def add_equipment_type():
     """Add new equipment type"""
     try:
@@ -343,6 +415,7 @@ def add_equipment_type():
         return redirect(url_for('equipment_types'))
 
 @app.route('/reports')
+@auth.require_auth
 def reports():
     """Reports dashboard"""
     try:
@@ -375,6 +448,7 @@ def reports():
                              stats={'total': 0, 'active': 0, 'red_tagged': 0, 'destroyed': 0})
 
 @app.route('/api/equipment/<equipment_id>')
+@auth.require_auth
 def api_equipment_details(equipment_id):
     """API endpoint for equipment details"""
     try:
@@ -391,6 +465,14 @@ def api_equipment_details(equipment_id):
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Template context processor to make auth available in templates
+@app.context_processor
+def inject_auth():
+    return {
+        'auth': auth,
+        'session': session
+    }
 
 # Template filters
 @app.template_filter('date_format')
