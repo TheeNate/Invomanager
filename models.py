@@ -6,11 +6,26 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict
 from dataclasses import dataclass
 from enum import Enum
+from decimal import Decimal
 
 class EquipmentStatus(Enum):
     ACTIVE = "ACTIVE"
     RED_TAGGED = "RED_TAGGED"
     DESTROYED = "DESTROYED"
+    IN_FIELD = "IN_FIELD"
+    WAREHOUSE = "WAREHOUSE"
+
+class JobStatus(Enum):
+    PENDING = "PENDING"
+    BID_SUBMITTED = "BID_SUBMITTED"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+class PaymentStatus(Enum):
+    PENDING = "PENDING"
+    PAID = "PAID"
+    OVERDUE = "OVERDUE"
 
 class InspectionResult(Enum):
     PASS = "PASS"
@@ -169,3 +184,81 @@ class BusinessRules:
         """Check if equipment should be automatically red tagged"""
         # Business rule: Failed inspections automatically red tag equipment
         return inspection_result == InspectionResult.FAIL
+
+@dataclass
+class Job:
+    job_id: str
+    customer_name: str
+    status: JobStatus
+    description: Optional[str] = None
+    projected_start_date: Optional[date] = None
+    projected_end_date: Optional[date] = None
+    location_city: Optional[str] = None
+    location_state: Optional[str] = None
+    job_title: Optional[str] = None
+    created_at: Optional[datetime] = None
+    
+    @property
+    def is_active(self) -> bool:
+        return self.status == JobStatus.ACTIVE
+    
+    @property
+    def is_pending(self) -> bool:
+        return self.status == JobStatus.PENDING
+    
+    @property
+    def is_completed(self) -> bool:
+        return self.status == JobStatus.COMPLETED
+    
+    @property
+    def is_cancelled(self) -> bool:
+        return self.status == JobStatus.CANCELLED
+    
+    @property
+    def can_have_equipment_assigned(self) -> bool:
+        """Only ACTIVE jobs can have equipment assigned"""
+        return self.is_active
+    
+    @property
+    def location_display(self) -> str:
+        """Format location for display"""
+        if self.location_city and self.location_state:
+            return f"{self.location_city}, {self.location_state}"
+        elif self.location_city:
+            return self.location_city
+        elif self.location_state:
+            return self.location_state
+        return "Not specified"
+
+@dataclass
+class JobBilling:
+    billing_id: int
+    job_id: str
+    payment_status: PaymentStatus
+    bid_amount: Optional[Decimal] = None
+    actual_cost: Optional[Decimal] = None
+    invoice_date: Optional[date] = None
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+    
+    @property
+    def is_paid(self) -> bool:
+        return self.payment_status == PaymentStatus.PAID
+    
+    @property
+    def is_overdue(self) -> bool:
+        return self.payment_status == PaymentStatus.OVERDUE
+    
+    @property
+    def bid_amount_display(self) -> str:
+        """Format bid amount for display"""
+        if self.bid_amount:
+            return f"${self.bid_amount:,.2f}"
+        return "Not specified"
+    
+    @property
+    def actual_cost_display(self) -> str:
+        """Format actual cost for display"""
+        if self.actual_cost:
+            return f"${self.actual_cost:,.2f}"
+        return "Not specified"

@@ -10,7 +10,7 @@ import os
 from dotenv import load_dotenv
 from database_postgres import DatabaseManager
 from auth import MagicLinkAuth
-from models import EquipmentStatus, InspectionResult
+from models import EquipmentStatus, InspectionResult, JobStatus, PaymentStatus
 from utils.helpers import format_date, parse_date
 from utils.validators import FormValidator
 from pdf_export import EquipmentPDFExporter
@@ -706,6 +706,277 @@ def bulk_put_in_service():
     except Exception as e:
         flash(f'Error updating service dates: {str(e)}', 'error')
         return redirect(url_for('index'))
+
+# Jobs & Billing Routes
+@app.route('/jobs')
+@auth.require_auth
+def jobs_dashboard():
+    """Jobs & Billing Dashboard"""
+    try:
+        # Get filter from query params
+        status_filter = request.args.get('status', 'All')
+        
+        # Get job statistics
+        job_stats = db_manager.get_job_stats()
+        
+        # Get jobs list with filter
+        jobs_list = db_manager.get_jobs_list(status_filter if status_filter != 'All' else None)
+        
+        return render_template('jobs_dashboard.html', 
+                             jobs_list=jobs_list,
+                             job_stats=job_stats,
+                             current_filter=status_filter)
+    
+    except Exception as e:
+        flash(f'Error loading jobs dashboard: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/jobs/add', methods=['GET', 'POST'])
+@auth.require_auth
+def add_job():
+    """Add new job"""
+    if request.method == 'POST':
+        try:
+            # Get form data
+            customer_name = request.form.get('customer_name', '').strip()
+            description = request.form.get('description', '').strip() or None
+            projected_start_date = parse_date(request.form.get('projected_start_date', '').strip())
+            projected_end_date = parse_date(request.form.get('projected_end_date', '').strip())
+            location_city = request.form.get('location_city', '').strip() or None
+            location_state = request.form.get('location_state', '').strip() or None
+            job_title = request.form.get('job_title', '').strip() or None
+            
+            # Validate required fields
+            if not customer_name:
+                flash('Customer name is required', 'error')
+                return render_template('add_job.html', form_data=request.form)
+            
+            # Validate dates
+            if projected_start_date and projected_start_date < date.today():
+                flash('Start date cannot be in the past', 'error')
+                return render_template('add_job.html', form_data=request.form)
+            
+            if projected_end_date and projected_start_date and projected_end_date < projected_start_date:
+                flash('End date must be after start date', 'error')
+                return render_template('add_job.html', form_data=request.form)
+            
+            # Add job
+            job_id = db_manager.add_job(
+                customer_name=customer_name,
+                description=description,
+                projected_start_date=projected_start_date,
+                projected_end_date=projected_end_date,
+                location_city=location_city,
+                location_state=location_state,
+                job_title=job_title
+            )
+            
+            flash(f'Job {job_id} created successfully', 'success')
+            return redirect(url_for('job_details', job_id=job_id))
+            
+        except Exception as e:
+            flash(f'Error creating job: {str(e)}', 'error')
+            return render_template('add_job.html', form_data=request.form)
+    
+    # GET request - show form
+    return render_template('add_job.html')
+
+@app.route('/jobs/<job_id>')
+@auth.require_auth
+def job_details(job_id):
+    """Job details page"""
+    try:
+        job = db_manager.get_job_by_id(job_id)
+        if not job:
+            flash('Job not found', 'error')
+            return redirect(url_for('jobs_dashboard'))
+        
+        # Get equipment assigned to this job
+        job_equipment = db_manager.get_job_equipment(job_id)
+        
+        return render_template('job_details.html', 
+                             job=job,
+                             job_equipment=job_equipment)
+    
+    except Exception as e:
+        flash(f'Error loading job details: {str(e)}', 'error')
+        return redirect(url_for('jobs_dashboard'))
+
+@app.route('/jobs/<job_id>/edit', methods=['GET', 'POST'])
+@auth.require_auth
+def edit_job(job_id):
+    """Edit job details"""
+    if request.method == 'POST':
+        try:
+            # Get form data
+            customer_name = request.form.get('customer_name', '').strip()
+            description = request.form.get('description', '').strip() or None
+            projected_start_date = parse_date(request.form.get('projected_start_date', '').strip())
+            projected_end_date = parse_date(request.form.get('projected_end_date', '').strip())
+            location_city = request.form.get('location_city', '').strip() or None
+            location_state = request.form.get('location_state', '').strip() or None
+            job_title = request.form.get('job_title', '').strip() or None
+            status = request.form.get('status')
+            
+            # Billing data
+            bid_amount = request.form.get('bid_amount', '').strip()
+            actual_cost = request.form.get('actual_cost', '').strip()
+            payment_status = request.form.get('payment_status')
+            invoice_date = parse_date(request.form.get('invoice_date', '').strip())
+            billing_notes = request.form.get('billing_notes', '').strip() or None
+            
+            # Validate required fields
+            if not customer_name:
+                flash('Customer name is required', 'error')
+                job = db_manager.get_job_by_id(job_id)
+                return render_template('edit_job.html', job=job, form_data=request.form)
+            
+            # Validate dates
+            if projected_start_date and projected_start_date < date.today():
+                flash('Start date cannot be in the past', 'error')
+                job = db_manager.get_job_by_id(job_id)
+                return render_template('edit_job.html', job=job, form_data=request.form)
+            
+            if projected_end_date and projected_start_date and projected_end_date < projected_start_date:
+                flash('End date must be after start date', 'error')
+                job = db_manager.get_job_by_id(job_id)
+                return render_template('edit_job.html', job=job, form_data=request.form)
+            
+            # Update job
+            success = db_manager.update_job(
+                job_id=job_id,
+                customer_name=customer_name,
+                description=description,
+                projected_start_date=projected_start_date,
+                projected_end_date=projected_end_date,
+                location_city=location_city,
+                location_state=location_state,
+                job_title=job_title,
+                status=status
+            )
+            
+            if success:
+                # Process billing amounts
+                from decimal import Decimal, InvalidOperation
+                bid_decimal = None
+                actual_decimal = None
+                
+                if bid_amount:
+                    try:
+                        bid_decimal = Decimal(bid_amount.replace('$', '').replace(',', ''))
+                    except InvalidOperation:
+                        pass
+                
+                if actual_cost:
+                    try:
+                        actual_decimal = Decimal(actual_cost.replace('$', '').replace(',', ''))
+                    except InvalidOperation:
+                        pass
+                
+                # Update billing
+                db_manager.update_job_billing(
+                    job_id=job_id,
+                    bid_amount=bid_decimal,
+                    actual_cost=actual_decimal,
+                    payment_status=payment_status,
+                    invoice_date=invoice_date,
+                    notes=billing_notes
+                )
+                
+                flash('Job updated successfully', 'success')
+            else:
+                flash('Failed to update job', 'error')
+            
+            return redirect(url_for('job_details', job_id=job_id))
+            
+        except Exception as e:
+            flash(f'Error updating job: {str(e)}', 'error')
+            job = db_manager.get_job_by_id(job_id)
+            return render_template('edit_job.html', job=job, form_data=request.form)
+    
+    # GET request - show form
+    try:
+        job = db_manager.get_job_by_id(job_id)
+        if not job:
+            flash('Job not found', 'error')
+            return redirect(url_for('jobs_dashboard'))
+        
+        return render_template('edit_job.html', job=job)
+    
+    except Exception as e:
+        flash(f'Error loading job for editing: {str(e)}', 'error')
+        return redirect(url_for('jobs_dashboard'))
+
+@app.route('/equipment/assign_to_job', methods=['POST'])
+@auth.require_auth
+def assign_equipment_to_job():
+    """Assign selected equipment to a job"""
+    try:
+        # Get selected equipment IDs and job ID from form
+        selected_ids = request.form.getlist('selected_equipment')
+        job_id = request.form.get('job_id')
+        
+        if not selected_ids:
+            flash('No equipment selected', 'error')
+            return redirect(url_for('index'))
+        
+        if not job_id:
+            flash('No job selected', 'error')
+            return redirect(url_for('index'))
+        
+        # Assign equipment to job
+        success_count = db_manager.assign_equipment_to_job(selected_ids, job_id)
+        
+        if success_count > 0:
+            flash(f'Successfully assigned {success_count} equipment item(s) to job {job_id}', 'success')
+        
+        if success_count < len(selected_ids):
+            failed_count = len(selected_ids) - success_count
+            flash(f'Failed to assign {failed_count} equipment item(s) (may already be assigned or have invalid status)', 'warning')
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        flash(f'Error assigning equipment to job: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/jobs/<job_id>/return_equipment', methods=['POST'])
+@auth.require_auth
+def return_equipment_from_job(job_id):
+    """Return selected equipment from a job"""
+    try:
+        # Get selected equipment IDs from form
+        selected_ids = request.form.getlist('selected_equipment')
+        
+        if not selected_ids:
+            flash('No equipment selected for return', 'error')
+            return redirect(url_for('job_details', job_id=job_id))
+        
+        # Return equipment from job
+        success_count = db_manager.return_equipment_from_job(selected_ids)
+        
+        if success_count > 0:
+            flash(f'Successfully returned {success_count} equipment item(s) from job', 'success')
+        
+        if success_count < len(selected_ids):
+            failed_count = len(selected_ids) - success_count
+            flash(f'Failed to return {failed_count} equipment item(s)', 'warning')
+        
+        return redirect(url_for('job_details', job_id=job_id))
+        
+    except Exception as e:
+        flash(f'Error returning equipment from job: {str(e)}', 'error')
+        return redirect(url_for('job_details', job_id=job_id))
+
+@app.route('/api/active_jobs')
+@auth.require_auth
+def api_active_jobs():
+    """API endpoint to get active jobs for equipment assignment dropdown"""
+    try:
+        active_jobs = db_manager.get_active_jobs()
+        return jsonify(active_jobs)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Use production mode for deployment

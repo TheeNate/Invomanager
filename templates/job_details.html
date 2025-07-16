@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Job {{ job.job_id }} Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-briefcase"></i> Job {{ job.job_id }} Details
+        </h1>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('edit_job', job_id=job.job_id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit Job
+            </a>
+            <a href="{{ url_for('jobs_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Jobs
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Job Information -->
+        <div class="col-lg-8">
+            <!-- Job Information Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-info-circle"></i> Job Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Job ID:</dt>
+                        <dd class="col-sm-8"><strong>{{ job.job_id }}</strong></dd>
+                        
+                        <dt class="col-sm-4">Customer Name:</dt>
+                        <dd class="col-sm-8">{{ job.customer_name }}</dd>
+                        
+                        <dt class="col-sm-4">Job Title:</dt>
+                        <dd class="col-sm-8">{{ job.job_title or '<em class="text-muted">Not specified</em>' | safe }}</dd>
+                        
+                        <dt class="col-sm-4">Status:</dt>
+                        <dd class="col-sm-8">
+                            {% if job.status == 'PENDING' %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% elif job.status == 'BID_SUBMITTED' %}
+                                <span class="badge bg-warning text-dark">Bid Submitted</span>
+                            {% elif job.status == 'ACTIVE' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif job.status == 'COMPLETED' %}
+                                <span class="badge bg-primary">Completed</span>
+                            {% elif job.status == 'CANCELLED' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Description:</dt>
+                        <dd class="col-sm-8">{{ job.description or '<em class="text-muted">No description provided</em>' | safe }}</dd>
+                        
+                        <dt class="col-sm-4">Location:</dt>
+                        <dd class="col-sm-8">
+                            {% if job.location_city and job.location_state %}
+                                {{ job.location_city }}, {{ job.location_state }}
+                            {% elif job.location_city %}
+                                {{ job.location_city }}
+                            {% elif job.location_state %}
+                                {{ job.location_state }}
+                            {% else %}
+                                <em class="text-muted">Not specified</em>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Projected Start Date:</dt>
+                        <dd class="col-sm-8">{{ job.projected_start_date | date_format if job.projected_start_date else '<em class="text-muted">Not set</em>' | safe }}</dd>
+                        
+                        <dt class="col-sm-4">Projected End Date:</dt>
+                        <dd class="col-sm-8">{{ job.projected_end_date | date_format if job.projected_end_date else '<em class="text-muted">Not set</em>' | safe }}</dd>
+                        
+                        <dt class="col-sm-4">Created:</dt>
+                        <dd class="col-sm-8">{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else 'Unknown' }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Equipment Section -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-gear"></i> Assigned Equipment ({{ job_equipment|length }} items)
+                    </h5>
+                    {% if job_equipment %}
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="showReturnEquipmentModal()">
+                        <i class="bi bi-arrow-left-circle"></i> Return Selected
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    {% if job_equipment %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="select-all-equipment" class="form-check-input" title="Select all">
+                                        </th>
+                                        <th>Equipment ID</th>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Serial Number</th>
+                                        <th>Status</th>
+                                        <th>Service Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for equipment in job_equipment %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input equipment-checkbox" 
+                                                   value="{{ equipment.equipment_id }}">
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('equipment_details', equipment_id=equipment.equipment_id) }}" 
+                                               class="text-decoration-none">
+                                                <strong>{{ equipment.equipment_id }}</strong>
+                                            </a>
+                                        </td>
+                                        <td>{{ equipment.name or '<em class="text-muted">Not specified</em>' | safe }}</td>
+                                        <td>{{ equipment.equipment_type }} - {{ equipment.type_description }}</td>
+                                        <td>{{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ equipment.status.replace('_', ' ').title() }}</span>
+                                        </td>
+                                        <td>{{ equipment.date_put_in_service | date_format if equipment.date_put_in_service else '<em class="text-muted">Not set</em>' | safe }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-gear display-4 text-muted"></i>
+                            <h5 class="text-muted mt-3">No Equipment Assigned</h5>
+                            <p class="text-muted">
+                                {% if job.status == 'ACTIVE' %}
+                                    Go to the <a href="{{ url_for('index') }}">equipment inventory</a> to assign equipment to this job.
+                                {% else %}
+                                    Equipment can only be assigned to ACTIVE jobs.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Billing Information -->
+        <div class="col-lg-4">
+            <!-- Billing Information Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-currency-dollar"></i> Billing Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-6">Bid Amount:</dt>
+                        <dd class="col-sm-6">
+                            {% if job.bid_amount %}
+                                <strong>${{ "{:,.2f}".format(job.bid_amount) }}</strong>
+                            {% else %}
+                                <em class="text-muted">Not set</em>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-6">Actual Cost:</dt>
+                        <dd class="col-sm-6">
+                            {% if job.actual_cost %}
+                                <strong>${{ "{:,.2f}".format(job.actual_cost) }}</strong>
+                            {% else %}
+                                <em class="text-muted">Not set</em>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-6">Payment Status:</dt>
+                        <dd class="col-sm-6">
+                            {% if job.payment_status == 'PENDING' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif job.payment_status == 'PAID' %}
+                                <span class="badge bg-success">Paid</span>
+                            {% elif job.payment_status == 'OVERDUE' %}
+                                <span class="badge bg-danger">Overdue</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-6">Invoice Date:</dt>
+                        <dd class="col-sm-6">{{ job.invoice_date | date_format if job.invoice_date else '<em class="text-muted">Not set</em>' | safe }}</dd>
+                        
+                        {% if job.billing_notes %}
+                        <dt class="col-sm-12">Notes:</dt>
+                        <dd class="col-sm-12">{{ job.billing_notes }}</dd>
+                        {% endif %}
+                    </dl>
+                    
+                    {% if job.bid_amount and job.actual_cost %}
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-6"><strong>Variance:</strong></div>
+                        <div class="col-sm-6">
+                            {% set variance = job.actual_cost - job.bid_amount %}
+                            {% if variance > 0 %}
+                                <span class="text-danger">+${{ "{:,.2f}".format(variance) }}</span>
+                            {% elif variance < 0 %}
+                                <span class="text-success">${{ "{:,.2f}".format(variance) }}</span>
+                            {% else %}
+                                <span class="text-muted">$0.00</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning"></i> Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if job.status != 'COMPLETED' and job.status != 'CANCELLED' %}
+                        <a href="{{ url_for('edit_job', job_id=job.job_id) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Edit Job Details
+                        </a>
+                        {% endif %}
+                        
+                        {% if job.status == 'ACTIVE' and job_equipment %}
+                        <button type="button" class="btn btn-outline-success" onclick="markJobComplete()">
+                            <i class="bi bi-check-circle"></i> Mark Complete
+                        </button>
+                        {% endif %}
+                        
+                        {% if job.payment_status == 'PENDING' %}
+                        <button type="button" class="btn btn-outline-info" onclick="generateInvoice()">
+                            <i class="bi bi-file-earmark-text"></i> Generate Invoice
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Return Equipment Modal -->
+<div class="modal fade" id="returnEquipmentModal" tabindex="-1" aria-labelledby="returnEquipmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="returnEquipmentModalLabel">
+                    <i class="bi bi-arrow-left-circle"></i> Return Equipment from Job
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Return the selected equipment items from this job. They will be set back to ACTIVE status and removed from the job.</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Note:</strong> Only equipment currently IN_FIELD status can be returned.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="submitReturnEquipment()">
+                    <i class="bi bi-arrow-left-circle"></i> Return Equipment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Equipment selection functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Select all checkbox functionality
+    const selectAllCheckbox = document.getElementById('select-all-equipment');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.equipment-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+});
+
+function showReturnEquipmentModal() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one equipment item to return.');
+        return;
+    }
+    
+    new bootstrap.Modal(document.getElementById('returnEquipmentModal')).show();
+}
+
+function submitReturnEquipment() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select equipment to return.');
+        return;
+    }
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('return_equipment_from_job', job_id=job.job_id) }}";
+    
+    // Add selected equipment IDs as hidden inputs
+    selectedCheckboxes.forEach(checkbox => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_equipment';
+        input.value = checkbox.value;
+        form.appendChild(input);
+    });
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+function markJobComplete() {
+    if (confirm('Are you sure you want to mark this job as complete? Make sure all equipment has been returned first.')) {
+        window.location.href = "{{ url_for('edit_job', job_id=job.job_id) }}#status";
+    }
+}
+
+function generateInvoice() {
+    alert('Invoice generation feature will be implemented in a future update.');
+}
+</script>
+{% endblock %}

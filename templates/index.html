@@ -77,6 +77,9 @@
             <button type="button" class="btn btn-sm btn-outline-success" onclick="showPutInServiceModal()">
                 <i class="bi bi-calendar-check"></i> Put in Service
             </button>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="showAssignToJobModal()">
+                <i class="bi bi-briefcase"></i> Assign to Job
+            </button>
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-file-earmark-pdf"></i> Export PDF
@@ -129,6 +132,47 @@
                 </p>
             </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Assign to Job Modal -->
+<div class="modal fade" id="assignToJobModal" tabindex="-1" aria-labelledby="assignToJobModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignToJobModalLabel">
+                    <i class="bi bi-briefcase"></i> Assign Equipment to Job
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignToJobForm" method="POST" action="{{ url_for('assign_equipment_to_job') }}">
+                    <div class="mb-3">
+                        <label for="jobSelect" class="form-label">Select Job <span class="text-danger">*</span></label>
+                        <select name="job_id" id="jobSelect" class="form-select" required>
+                            <option value="">Loading active jobs...</option>
+                        </select>
+                        <div class="form-text">Only ACTIVE jobs are available for equipment assignment</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Assignment Rules:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Only equipment with ACTIVE or WAREHOUSE status can be assigned</li>
+                            <li>Equipment will be changed to IN_FIELD status when assigned</li>
+                            <li>Equipment can only be assigned to ACTIVE jobs</li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAssignToJob()">
+                    <i class="bi bi-briefcase"></i> Assign to Job
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -534,6 +578,91 @@ function submitPutInService() {
         csrfInput.value = csrfToken.value;
         form.appendChild(csrfInput);
     }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// Job assignment functionality
+function showAssignToJobModal() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one equipment item to assign to a job.');
+        return;
+    }
+    
+    // Load active jobs
+    loadActiveJobs();
+    
+    // Show modal
+    new bootstrap.Modal(document.getElementById('assignToJobModal')).show();
+}
+
+function loadActiveJobs() {
+    const jobSelect = document.getElementById('jobSelect');
+    jobSelect.innerHTML = '<option value="">Loading...</option>';
+    
+    fetch("{{ url_for('api_active_jobs') }}")
+        .then(response => response.json())
+        .then(jobs => {
+            jobSelect.innerHTML = '<option value="">Select a job...</option>';
+            
+            if (jobs.length === 0) {
+                jobSelect.innerHTML = '<option value="">No active jobs available</option>';
+                jobSelect.disabled = true;
+            } else {
+                jobs.forEach(job => {
+                    const option = document.createElement('option');
+                    option.value = job.job_id;
+                    option.textContent = `${job.job_id} - ${job.customer_name}${job.job_title ? ' (' + job.job_title + ')' : ''}`;
+                    jobSelect.appendChild(option);
+                });
+                jobSelect.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading active jobs:', error);
+            jobSelect.innerHTML = '<option value="">Error loading jobs</option>';
+            jobSelect.disabled = true;
+        });
+}
+
+function submitAssignToJob() {
+    const selectedCheckboxes = document.querySelectorAll('.equipment-checkbox:checked');
+    const jobSelect = document.getElementById('jobSelect');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select equipment to assign.');
+        return;
+    }
+    
+    if (!jobSelect.value) {
+        alert('Please select a job.');
+        return;
+    }
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('assign_equipment_to_job') }}";
+    
+    // Add selected equipment IDs as hidden inputs
+    selectedCheckboxes.forEach(checkbox => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_equipment';
+        input.value = checkbox.value;
+        form.appendChild(input);
+    });
+    
+    // Add job ID
+    const jobInput = document.createElement('input');
+    jobInput.type = 'hidden';
+    jobInput.name = 'job_id';
+    jobInput.value = jobSelect.value;
+    form.appendChild(jobInput);
     
     document.body.appendChild(form);
     form.submit();

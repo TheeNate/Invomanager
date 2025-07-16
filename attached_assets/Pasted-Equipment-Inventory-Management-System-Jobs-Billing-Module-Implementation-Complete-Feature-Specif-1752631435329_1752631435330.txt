@@ -1,0 +1,214 @@
+Equipment Inventory Management System - Jobs & Billing Module Implementation
+Complete Feature Specification
+OVERVIEW
+Add a comprehensive jobs and billing management system that integrates with the existing equipment inventory. This feature allows users to create and manage work orders, track billing information, and assign equipment to active jobs directly from the equipment inventory page.
+DATABASE REQUIREMENTS
+New Jobs Table
+Create a new table called "Jobs" with the following exact fields:
+
+job_id: Primary key, VARCHAR(4), format A000, A001, A002, etc. (auto-generated)
+customer_name: VARCHAR(200), required field for client name
+description: TEXT field, optional, for detailed job description
+projected_start_date: DATE field, optional, when job is expected to begin
+projected_end_date: DATE field, optional, when job is expected to complete
+location_city: VARCHAR(100), optional, city where job takes place
+location_state: VARCHAR(50), optional, state abbreviation where job takes place
+job_title: VARCHAR(200), optional, brief title or name for the job
+status: VARCHAR(20) with constraint, must be one of: PENDING, BID_SUBMITTED, ACTIVE, COMPLETED, CANCELLED (default PENDING)
+created_at: TIMESTAMP, auto-populated when record is created
+
+New Job_Billing Table
+Create a new table called "Job_Billing" with the following exact fields:
+
+billing_id: Primary key, auto-incrementing serial number
+job_id: Foreign key reference to Jobs table, VARCHAR(4), required
+bid_amount: DECIMAL(10,2), optional, the quoted price for the job
+actual_cost: DECIMAL(10,2), optional, the real cost incurred
+payment_status: VARCHAR(20) with constraint, must be one of: PENDING, PAID, OVERDUE (default PENDING)
+invoice_date: DATE field, optional, when invoice was sent
+notes: TEXT field, optional, billing-related notes
+created_at: TIMESTAMP, auto-populated when record is created
+
+Equipment Table Modifications
+Modify the existing Equipment table by adding these exact columns:
+
+job_id: VARCHAR(4), nullable, foreign key reference to Jobs table
+Modify the existing status field constraint to include two new values: IN_FIELD, WAREHOUSE
+The complete status options must be: ACTIVE, RED_TAGGED, DESTROYED, IN_FIELD, WAREHOUSE
+
+NAVIGATION CHANGES
+Top Menu Bar Addition
+Add a new navigation link in the top menu bar called "Jobs & Billing" that appears between the existing "Equipment Types" and "Reports" menu items. This link should route to the main jobs dashboard page.
+NEW PAGES REQUIRED
+Jobs Dashboard Page (main jobs listing)
+Create a complete page that displays:
+
+Header section: Page title "Jobs & Billing Dashboard" with a "New Job" button and "Refresh" button
+Statistics cards row: Six cards showing counts for Total Jobs, Pending, Bid Submitted, Active, Completed, and Cancelled jobs
+Filter section: Dropdown to filter jobs by status (All, Pending, Bid Submitted, Active, Completed, Cancelled) with Filter and Clear buttons
+Jobs table: Sortable table with columns for Job ID (clickable link), Customer Name, Job Title, Location (City, State), Start Date, Status (colored badge), Bid Amount (formatted currency), Payment Status (colored badge), and Actions (View/Edit buttons)
+Empty state: When no jobs exist, show helpful message with link to create first job
+Pagination: If more than 50 jobs, implement pagination controls
+
+Add New Job Page
+Create a form page with:
+
+Customer Information section: Required customer name field
+Job Details section: Optional job title and description text area
+Location section: Optional city and state fields in two-column layout
+Dates section: Optional projected start date and end date with date pickers
+Form validation: Customer name must be provided, dates cannot be in the past, end date must be after start date
+Success handling: After creation, redirect to the job details page with success message
+Error handling: Display validation errors clearly, preserve form data on error
+
+Job Details Page
+Create a comprehensive view showing:
+
+Job information card: Display job ID, customer name, title, description, location, dates, status with edit button
+Billing information card: Show bid amount, actual cost, payment status, invoice date, billing notes with edit button
+Equipment section: Table of all equipment currently assigned to this job with checkboxes and "Return Selected" button
+Status management: Allow changing job status with appropriate warnings (e.g., completing job with equipment still assigned)
+Quick actions: Buttons for common operations like "Mark Complete", "Generate Invoice", etc.
+
+Edit Job Page
+Create an edit form that includes:
+
+All job details: Customer name, title, description, location, dates
+Status management: Dropdown to change job status with business rule validation
+Billing section: Edit bid amount, actual cost, payment status, invoice date, billing notes
+Validation: Same rules as add job page plus status-specific validations
+Change tracking: Log significant changes like status updates
+
+EQUIPMENT PAGE INTEGRATION
+Equipment Assignment Interface
+Modify the existing equipment inventory page to add:
+
+Assignment dropdown: New dropdown button between "View Reports" and existing buttons, labeled "Assign to Job"
+Dropdown population: Dropdown must only show jobs with status "ACTIVE" (no pending, bid submitted, completed, or cancelled jobs)
+Dropdown format: Display jobs as "A001 - Customer Name - Job Title" for easy identification
+Equipment selection: Add checkboxes to the left of each equipment row for multi-selection
+Selection restrictions: Only allow selection of equipment with status ACTIVE or WAREHOUSE (disable checkboxes for RED_TAGGED, DESTROYED, IN_FIELD equipment)
+Assignment button: "Assign Selected to Job" button that appears when both job and equipment are selected
+Visual feedback: Selected equipment rows should highlight, assignment should show loading state
+Success confirmation: After assignment, show count of equipment assigned and refresh the equipment list
+
+Equipment Status Updates During Assignment
+When equipment is assigned to a job:
+
+Status change: Equipment status must change from ACTIVE or WAREHOUSE to IN_FIELD
+Job reference: The job_id field must be populated with the assigned job ID
+Visual indication: Equipment list should immediately reflect the new status and show which job it's assigned to
+Filtering impact: If user has status filters applied, assigned equipment may disappear from view (this is expected)
+
+Equipment Return Process
+On the job details page, provide ability to return equipment:
+
+Equipment table: Show all equipment assigned to the job with checkboxes
+Return button: "Return Selected Equipment" button to process returns
+Status restoration: Returned equipment status changes from IN_FIELD back to ACTIVE
+Job reference clearing: The job_id field is set to NULL when equipment is returned
+Bulk operations: Allow returning multiple pieces of equipment simultaneously
+
+BUSINESS RULES ENFORCEMENT
+Job Status Workflow
+
+Creation: New jobs start with PENDING status
+Progression: PENDING → BID_SUBMITTED → ACTIVE → COMPLETED (or CANCELLED at any point)
+Equipment assignment: Only ACTIVE jobs can have equipment assigned
+Completion restrictions: Jobs with assigned equipment should warn user before allowing completion
+Status restrictions: Prevent changing COMPLETED jobs back to ACTIVE
+
+Equipment Assignment Rules
+
+Availability: Only ACTIVE and WAREHOUSE status equipment can be assigned to jobs
+Exclusivity: Equipment can only be assigned to one job at a time
+Assignment validation: Verify job is ACTIVE before allowing assignment
+Assignment tracking: Track which user assigned equipment and when
+Return validation: Only IN_FIELD equipment can be returned from jobs
+
+Job ID Generation
+
+Format: Exactly A000, A001, A002, etc. (letter A followed by three-digit zero-padded number)
+Auto-increment: Find highest existing job ID number and increment by 1
+Uniqueness: Ensure no duplicate job IDs can be created
+Starting point: First job should be A000, not A001
+
+USER INTERFACE REQUIREMENTS
+Visual Design Standards
+
+Consistency: Use same Bootstrap 5 styling as existing pages
+Color coding:
+
+Job status badges: PENDING (secondary), BID_SUBMITTED (warning), ACTIVE (success), COMPLETED (primary), CANCELLED (danger)
+Payment status badges: PENDING (warning), PAID (success), OVERDUE (danger)
+Equipment status: IN_FIELD (info), WAREHOUSE (secondary)
+
+
+Icons: Use Bootstrap Icons consistently (bi-briefcase for jobs, bi-currency-dollar for billing, bi-gear for equipment)
+Responsive design: All new pages must work on mobile devices
+
+Form Interaction Patterns
+
+Required fields: Mark with red asterisk, validate on submit
+Date inputs: Use HTML5 date picker, validate date ranges
+Currency inputs: Format with dollar signs and commas, validate numeric input
+Dropdown selections: Use searchable dropdowns for long lists
+Bulk actions: Provide "Select All" and "Select None" options for equipment assignment
+
+Error Handling and Validation
+
+Client-side validation: Immediate feedback on form field errors
+Server-side validation: Comprehensive validation with detailed error messages
+Database constraints: Handle constraint violations gracefully
+Concurrent modification: Handle cases where data changes between page load and submission
+Network errors: Provide retry mechanisms for failed operations
+
+INTEGRATION POINTS
+Equipment Search and Filtering
+
+Job-based filtering: Add job ID and job customer name to equipment search functionality
+Status filtering: Update equipment status filter to include IN_FIELD and WAREHOUSE options
+Assignment indicator: Show job assignment in equipment list (e.g., "IN_FIELD - A001")
+
+Reporting Integration
+
+Equipment reports: Update overdue inspection reports to consider equipment on jobs
+Job reports: Add job-specific reports (equipment utilization, job profitability, etc.)
+Combined reporting: Cross-reference equipment inspection schedules with job assignments
+
+Database Initialization
+
+Schema updates: Modify database initialization to create new tables and update constraints
+Data migration: Handle existing equipment data when adding new status options
+Sample data: Create sample jobs for testing and demonstration
+
+PERFORMANCE CONSIDERATIONS
+Database Optimization
+
+Indexing: Add indexes on job_id foreign keys and status fields for efficient filtering
+Query optimization: Use joins efficiently when displaying equipment with job information
+Pagination: Implement pagination for large job lists and equipment assignments
+
+User Experience
+
+Loading states: Show loading indicators for operations that might take time
+Caching: Cache active jobs list for equipment assignment dropdown
+Refresh patterns: Auto-refresh data when returning from other pages
+
+TESTING REQUIREMENTS
+Functional Testing Scenarios
+
+Job lifecycle: Create job → assign equipment → complete job → return equipment
+Status transitions: Test all valid and invalid job status changes
+Equipment conflicts: Attempt to assign already-assigned equipment
+Bulk operations: Assign/return multiple pieces of equipment simultaneously
+Edge cases: Jobs with no equipment, equipment with no jobs, cancelled jobs with assigned equipment
+
+Data Validation Testing
+
+Required fields: Submit forms with missing required data
+Format validation: Test job ID generation, date validation, currency formatting
+Business rules: Test equipment assignment restrictions, status change validations
+Concurrency: Test simultaneous equipment assignments by different users
+
+This specification provides complete implementation guidance for adding comprehensive job and billing management to the equipment inventory system while maintaining integration with existing functionality.

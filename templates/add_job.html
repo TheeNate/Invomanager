@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Add New Job{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-briefcase-fill"></i> Add New Job
+                </h1>
+                <a href="{{ url_for('jobs_dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Jobs
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Customer Information Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="bi bi-person-fill"></i> Customer Information
+                            </h5>
+                            <div class="mb-3">
+                                <label for="customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                <input type="text" name="customer_name" id="customer_name" class="form-control" 
+                                       value="{{ form_data.customer_name if form_data }}" required>
+                            </div>
+                        </div>
+
+                        <!-- Job Details Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="bi bi-file-text"></i> Job Details
+                            </h5>
+                            <div class="mb-3">
+                                <label for="job_title" class="form-label">Job Title</label>
+                                <input type="text" name="job_title" id="job_title" class="form-control" 
+                                       value="{{ form_data.job_title if form_data }}">
+                                <div class="form-text">Brief title or name for the job</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea name="description" id="description" class="form-control" rows="4">{{ form_data.description if form_data }}</textarea>
+                                <div class="form-text">Detailed description of the work to be performed</div>
+                            </div>
+                        </div>
+
+                        <!-- Location Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="bi bi-geo-alt"></i> Location
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="location_city" class="form-label">City</label>
+                                        <input type="text" name="location_city" id="location_city" class="form-control" 
+                                               value="{{ form_data.location_city if form_data }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="location_state" class="form-label">State</label>
+                                        <input type="text" name="location_state" id="location_state" class="form-control" 
+                                               value="{{ form_data.location_state if form_data }}" maxlength="50">
+                                        <div class="form-text">State abbreviation (e.g., CA, NY)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dates Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="bi bi-calendar"></i> Dates
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="projected_start_date" class="form-label">Projected Start Date</label>
+                                        <input type="date" name="projected_start_date" id="projected_start_date" class="form-control" 
+                                               value="{{ form_data.projected_start_date if form_data }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="projected_end_date" class="form-label">Projected End Date</label>
+                                        <input type="date" name="projected_end_date" id="projected_end_date" class="form-control" 
+                                               value="{{ form_data.projected_end_date if form_data }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Business Rules Info -->
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Job Creation Rules:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>New jobs are created with PENDING status</li>
+                                <li>Customer name is required</li>
+                                <li>Dates cannot be in the past</li>
+                                <li>End date must be after start date</li>
+                                <li>A billing record will be automatically created</li>
+                            </ul>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('jobs_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-plus-circle"></i> Create Job
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Date validation
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('projected_start_date');
+    const endDateInput = document.getElementById('projected_end_date');
+    
+    function validateDates() {
+        const startDate = new Date(startDateInput.value);
+        const endDate = new Date(endDateInput.value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Validate start date
+        if (startDateInput.value && startDate < today) {
+            startDateInput.setCustomValidity('Start date cannot be in the past');
+        } else {
+            startDateInput.setCustomValidity('');
+        }
+        
+        // Validate end date
+        if (endDateInput.value && startDateInput.value && endDate < startDate) {
+            endDateInput.setCustomValidity('End date must be after start date');
+        } else {
+            endDateInput.setCustomValidity('');
+        }
+    }
+    
+    startDateInput.addEventListener('change', validateDates);
+    endDateInput.addEventListener('change', validateDates);
+});
+</script>
+{% endblock %}

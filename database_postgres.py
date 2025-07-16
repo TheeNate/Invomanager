@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 from datetime import date, datetime
 from typing import List, Dict, Optional
+from decimal import Decimal
 import csv
 import os
 
@@ -78,6 +79,37 @@ class DatabaseManager:
             )
         """)
         
+        # Jobs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Jobs (
+                job_id VARCHAR(4) PRIMARY KEY,
+                customer_name VARCHAR(200) NOT NULL,
+                description TEXT,
+                projected_start_date DATE,
+                projected_end_date DATE,
+                location_city VARCHAR(100),
+                location_state VARCHAR(50),
+                job_title VARCHAR(200),
+                status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'BID_SUBMITTED', 'ACTIVE', 'COMPLETED', 'CANCELLED')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Job Billing table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Job_Billing (
+                billing_id SERIAL PRIMARY KEY,
+                job_id VARCHAR(4) NOT NULL,
+                bid_amount DECIMAL(10,2),
+                actual_cost DECIMAL(10,2),
+                payment_status VARCHAR(20) DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PAID', 'OVERDUE')),
+                invoice_date DATE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (job_id) REFERENCES Jobs(job_id)
+            )
+        """)
+
         # Equipment table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Equipment (
@@ -88,8 +120,10 @@ class DatabaseManager:
                 serial_number VARCHAR(50),
                 date_added_to_inventory DATE DEFAULT CURRENT_DATE,
                 date_put_in_service DATE,
+                job_id VARCHAR(4),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (equipment_type) REFERENCES Equipment_Types(type_code)
+                FOREIGN KEY (equipment_type) REFERENCES Equipment_Types(type_code),
+                FOREIGN KEY (job_id) REFERENCES Jobs(job_id)
             )
         """)
         
@@ -628,5 +662,338 @@ class DatabaseManager:
             return True
         except Exception:
             return False
+        finally:
+            conn.close()
+    
+    # Job Management Methods
+    def add_job(self, customer_name: str, description: str = None, projected_start_date: date = None, 
+                projected_end_date: date = None, location_city: str = None, location_state: str = None,
+                job_title: str = None) -> str:
+        """Add new job and return the generated job ID"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Generate next job ID
+            job_id = self._generate_job_id()
+            
+            cursor.execute("""
+                INSERT INTO Jobs (job_id, customer_name, description, projected_start_date, 
+                                projected_end_date, location_city, location_state, job_title)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (job_id, customer_name, description, projected_start_date, 
+                  projected_end_date, location_city, location_state, job_title))
+            
+            # Create default billing record
+            cursor.execute("""
+                INSERT INTO Job_Billing (job_id)
+                VALUES (%s)
+            """, (job_id,))
+            
+            conn.commit()
+            return job_id
+        finally:
+            conn.close()
+    
+    def _generate_job_id(self) -> str:
+        """Generate next available job ID in format A000, A001, etc."""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT job_id FROM Jobs 
+                WHERE job_id ~ '^A[0-9]{3}$'
+                ORDER BY job_id DESC 
+                LIMIT 1
+            """)
+            
+            result = cursor.fetchone()
+            if result:
+                # Extract number and increment
+                last_id = result[0]
+                number = int(last_id[1:]) + 1
+            else:
+                # First job starts at A000
+                number = 0
+            
+            return f"A{number:03d}"
+        finally:
+            conn.close()
+    
+    def get_jobs_list(self, status_filter: str = None) -> List[Dict]:
+        """Get list of jobs with optional status filter"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            if status_filter and status_filter != 'All':
+                cursor.execute("""
+                    SELECT j.*, jb.bid_amount, jb.actual_cost, jb.payment_status
+                    FROM Jobs j
+                    LEFT JOIN Job_Billing jb ON j.job_id = jb.job_id
+                    WHERE j.status = %s
+                    ORDER BY j.created_at DESC
+                """, (status_filter,))
+            else:
+                cursor.execute("""
+                    SELECT j.*, jb.bid_amount, jb.actual_cost, jb.payment_status
+                    FROM Jobs j
+                    LEFT JOIN Job_Billing jb ON j.job_id = jb.job_id
+                    ORDER BY j.created_at DESC
+                """)
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    
+    def get_job_by_id(self, job_id: str) -> Optional[Dict]:
+        """Get job details by ID"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cursor.execute("""
+                SELECT j.*, jb.billing_id, jb.bid_amount, jb.actual_cost, 
+                       jb.payment_status, jb.invoice_date, jb.notes as billing_notes
+                FROM Jobs j
+                LEFT JOIN Job_Billing jb ON j.job_id = jb.job_id
+                WHERE j.job_id = %s
+            """, (job_id,))
+            
+            result = cursor.fetchone()
+            return dict(result) if result else None
+        finally:
+            conn.close()
+    
+    def update_job(self, job_id: str, customer_name: str, description: str = None,
+                   projected_start_date: date = None, projected_end_date: date = None,
+                   location_city: str = None, location_state: str = None,
+                   job_title: str = None, status: str = None) -> bool:
+        """Update job details"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Build dynamic update query
+            update_fields = []
+            values = []
+            
+            if customer_name is not None:
+                update_fields.append("customer_name = %s")
+                values.append(customer_name)
+            if description is not None:
+                update_fields.append("description = %s")
+                values.append(description)
+            if projected_start_date is not None:
+                update_fields.append("projected_start_date = %s")
+                values.append(projected_start_date)
+            if projected_end_date is not None:
+                update_fields.append("projected_end_date = %s")
+                values.append(projected_end_date)
+            if location_city is not None:
+                update_fields.append("location_city = %s")
+                values.append(location_city)
+            if location_state is not None:
+                update_fields.append("location_state = %s")
+                values.append(location_state)
+            if job_title is not None:
+                update_fields.append("job_title = %s")
+                values.append(job_title)
+            if status is not None:
+                update_fields.append("status = %s")
+                values.append(status)
+            
+            if not update_fields:
+                return True  # Nothing to update
+            
+            values.append(job_id)
+            
+            cursor.execute(f"""
+                UPDATE Jobs 
+                SET {', '.join(update_fields)}
+                WHERE job_id = %s
+            """, values)
+            
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+    
+    def update_job_billing(self, job_id: str, bid_amount: Decimal = None, actual_cost: Decimal = None,
+                          payment_status: str = None, invoice_date: date = None, notes: str = None) -> bool:
+        """Update job billing information"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Build dynamic update query
+            update_fields = []
+            values = []
+            
+            if bid_amount is not None:
+                update_fields.append("bid_amount = %s")
+                values.append(bid_amount)
+            if actual_cost is not None:
+                update_fields.append("actual_cost = %s")
+                values.append(actual_cost)
+            if payment_status is not None:
+                update_fields.append("payment_status = %s")
+                values.append(payment_status)
+            if invoice_date is not None:
+                update_fields.append("invoice_date = %s")
+                values.append(invoice_date)
+            if notes is not None:
+                update_fields.append("notes = %s")
+                values.append(notes)
+            
+            if not update_fields:
+                return True  # Nothing to update
+            
+            values.append(job_id)
+            
+            cursor.execute(f"""
+                UPDATE Job_Billing 
+                SET {', '.join(update_fields)}
+                WHERE job_id = %s
+            """, values)
+            
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+    
+    def get_active_jobs(self) -> List[Dict]:
+        """Get list of jobs with ACTIVE status for equipment assignment"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cursor.execute("""
+                SELECT job_id, customer_name, job_title
+                FROM Jobs
+                WHERE status = 'ACTIVE'
+                ORDER BY customer_name, job_title
+            """)
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    
+    def assign_equipment_to_job(self, equipment_ids: List[str], job_id: str) -> int:
+        """Assign multiple equipment items to a job, returns count of successful assignments"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            success_count = 0
+            
+            for equipment_id in equipment_ids:
+                # Check if equipment can be assigned (ACTIVE or WAREHOUSE status)
+                cursor.execute("""
+                    SELECT status FROM Equipment 
+                    WHERE equipment_id = %s AND status IN ('ACTIVE', 'WAREHOUSE')
+                """, (equipment_id,))
+                
+                if cursor.fetchone():
+                    # Update equipment status and assign to job
+                    cursor.execute("""
+                        UPDATE Equipment 
+                        SET status = 'IN_FIELD', job_id = %s
+                        WHERE equipment_id = %s
+                    """, (job_id, equipment_id))
+                    
+                    if cursor.rowcount > 0:
+                        success_count += 1
+            
+            conn.commit()
+            return success_count
+        finally:
+            conn.close()
+    
+    def get_job_equipment(self, job_id: str) -> List[Dict]:
+        """Get all equipment assigned to a specific job"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cursor.execute("""
+                SELECT e.equipment_id, e.equipment_type, et.description as type_description,
+                       e.name, e.serial_number, e.status, e.date_put_in_service
+                FROM Equipment e
+                JOIN Equipment_Types et ON e.equipment_type = et.type_code
+                WHERE e.job_id = %s
+                ORDER BY e.equipment_type, e.equipment_id
+            """, (job_id,))
+            
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    
+    def return_equipment_from_job(self, equipment_ids: List[str]) -> int:
+        """Return multiple equipment items from job, returns count of successful returns"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            success_count = 0
+            
+            for equipment_id in equipment_ids:
+                # Check if equipment is currently IN_FIELD
+                cursor.execute("""
+                    SELECT status FROM Equipment 
+                    WHERE equipment_id = %s AND status = 'IN_FIELD'
+                """, (equipment_id,))
+                
+                if cursor.fetchone():
+                    # Return equipment to ACTIVE status and clear job assignment
+                    cursor.execute("""
+                        UPDATE Equipment 
+                        SET status = 'ACTIVE', job_id = NULL
+                        WHERE equipment_id = %s
+                    """, (equipment_id,))
+                    
+                    if cursor.rowcount > 0:
+                        success_count += 1
+            
+            conn.commit()
+            return success_count
+        finally:
+            conn.close()
+    
+    def get_job_stats(self) -> Dict:
+        """Get job statistics for dashboard"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            stats = {
+                'total': 0,
+                'pending': 0,
+                'bid_submitted': 0,
+                'active': 0,
+                'completed': 0,
+                'cancelled': 0
+            }
+            
+            cursor.execute("""
+                SELECT status, COUNT(*) as count
+                FROM Jobs
+                GROUP BY status
+            """)
+            
+            for row in cursor.fetchall():
+                status, count = row
+                stats['total'] += count
+                if status == 'PENDING':
+                    stats['pending'] = count
+                elif status == 'BID_SUBMITTED':
+                    stats['bid_submitted'] = count
+                elif status == 'ACTIVE':
+                    stats['active'] = count
+                elif status == 'COMPLETED':
+                    stats['completed'] = count
+                elif status == 'CANCELLED':
+                    stats['cancelled'] = count
+            
+            return stats
         finally:
             conn.close()

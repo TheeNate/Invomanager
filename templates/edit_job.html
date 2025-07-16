@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Job {{ job.job_id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-pencil"></i> Edit Job {{ job.job_id }}
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('job_details', job_id=job.job_id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Details
+                    </a>
+                    <a href="{{ url_for('jobs_dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-list"></i> Back to Jobs
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <!-- Left Column: Job Information -->
+                            <div class="col-lg-8">
+                                <!-- Customer Information Section -->
+                                <div class="mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="bi bi-person-fill"></i> Customer Information
+                                    </h5>
+                                    <div class="mb-3">
+                                        <label for="customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="customer_name" id="customer_name" class="form-control" 
+                                               value="{{ form_data.customer_name if form_data else job.customer_name }}" required>
+                                    </div>
+                                </div>
+
+                                <!-- Job Details Section -->
+                                <div class="mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="bi bi-file-text"></i> Job Details
+                                    </h5>
+                                    <div class="mb-3">
+                                        <label for="job_title" class="form-label">Job Title</label>
+                                        <input type="text" name="job_title" id="job_title" class="form-control" 
+                                               value="{{ form_data.job_title if form_data else (job.job_title or '') }}">
+                                        <div class="form-text">Brief title or name for the job</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="description" class="form-label">Description</label>
+                                        <textarea name="description" id="description" class="form-control" rows="4">{{ form_data.description if form_data else (job.description or '') }}</textarea>
+                                        <div class="form-text">Detailed description of the work to be performed</div>
+                                    </div>
+                                </div>
+
+                                <!-- Location Section -->
+                                <div class="mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="bi bi-geo-alt"></i> Location
+                                    </h5>
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                <label for="location_city" class="form-label">City</label>
+                                                <input type="text" name="location_city" id="location_city" class="form-control" 
+                                                       value="{{ form_data.location_city if form_data else (job.location_city or '') }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="location_state" class="form-label">State</label>
+                                                <input type="text" name="location_state" id="location_state" class="form-control" 
+                                                       value="{{ form_data.location_state if form_data else (job.location_state or '') }}" maxlength="50">
+                                                <div class="form-text">State abbreviation (e.g., CA, NY)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Dates Section -->
+                                <div class="mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="bi bi-calendar"></i> Dates
+                                    </h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="projected_start_date" class="form-label">Projected Start Date</label>
+                                                <input type="date" name="projected_start_date" id="projected_start_date" class="form-control" 
+                                                       value="{{ form_data.projected_start_date if form_data else (job.projected_start_date | date_format('%Y-%m-%d') if job.projected_start_date else '') }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="projected_end_date" class="form-label">Projected End Date</label>
+                                                <input type="date" name="projected_end_date" id="projected_end_date" class="form-control" 
+                                                       value="{{ form_data.projected_end_date if form_data else (job.projected_end_date | date_format('%Y-%m-%d') if job.projected_end_date else '') }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Status Section -->
+                                <div class="mb-4">
+                                    <h5 class="mb-3" id="status">
+                                        <i class="bi bi-flag"></i> Job Status
+                                    </h5>
+                                    <div class="mb-3">
+                                        <label for="status" class="form-label">Status</label>
+                                        <select name="status" id="status" class="form-select">
+                                            <option value="PENDING" {{ 'selected' if (form_data.status if form_data else job.status) == 'PENDING' }}>Pending</option>
+                                            <option value="BID_SUBMITTED" {{ 'selected' if (form_data.status if form_data else job.status) == 'BID_SUBMITTED' }}>Bid Submitted</option>
+                                            <option value="ACTIVE" {{ 'selected' if (form_data.status if form_data else job.status) == 'ACTIVE' }}>Active</option>
+                                            <option value="COMPLETED" {{ 'selected' if (form_data.status if form_data else job.status) == 'COMPLETED' }}>Completed</option>
+                                            <option value="CANCELLED" {{ 'selected' if (form_data.status if form_data else job.status) == 'CANCELLED' }}>Cancelled</option>
+                                        </select>
+                                        <div class="form-text">
+                                            <strong>Note:</strong> Equipment can only be assigned to ACTIVE jobs.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Column: Billing Information -->
+                            <div class="col-lg-4">
+                                <div class="mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="bi bi-currency-dollar"></i> Billing Information
+                                    </h5>
+                                    
+                                    <div class="mb-3">
+                                        <label for="bid_amount" class="form-label">Bid Amount</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" name="bid_amount" id="bid_amount" class="form-control" 
+                                                   step="0.01" min="0" 
+                                                   value="{{ form_data.bid_amount if form_data else (job.bid_amount if job.bid_amount else '') }}">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="actual_cost" class="form-label">Actual Cost</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" name="actual_cost" id="actual_cost" class="form-control" 
+                                                   step="0.01" min="0" 
+                                                   value="{{ form_data.actual_cost if form_data else (job.actual_cost if job.actual_cost else '') }}">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="payment_status" class="form-label">Payment Status</label>
+                                        <select name="payment_status" id="payment_status" class="form-select">
+                                            <option value="PENDING" {{ 'selected' if (form_data.payment_status if form_data else job.payment_status) == 'PENDING' }}>Pending</option>
+                                            <option value="PAID" {{ 'selected' if (form_data.payment_status if form_data else job.payment_status) == 'PAID' }}>Paid</option>
+                                            <option value="OVERDUE" {{ 'selected' if (form_data.payment_status if form_data else job.payment_status) == 'OVERDUE' }}>Overdue</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="invoice_date" class="form-label">Invoice Date</label>
+                                        <input type="date" name="invoice_date" id="invoice_date" class="form-control" 
+                                               value="{{ form_data.invoice_date if form_data else (job.invoice_date | date_format('%Y-%m-%d') if job.invoice_date else '') }}">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="billing_notes" class="form-label">Billing Notes</label>
+                                        <textarea name="billing_notes" id="billing_notes" class="form-control" rows="3">{{ form_data.billing_notes if form_data else (job.billing_notes or '') }}</textarea>
+                                        <div class="form-text">Internal notes about billing or payment</div>
+                                    </div>
+                                </div>
+
+                                <!-- Billing Calculations -->
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-calculator"></i> Calculations
+                                        </h6>
+                                        <div id="billing-calculations">
+                                            <div class="row">
+                                                <div class="col-6"><strong>Variance:</strong></div>
+                                                <div class="col-6" id="variance-display">
+                                                    <em class="text-muted">Enter amounts above</em>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{{ url_for('job_details', job_id=job.job_id) }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Date validation
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('projected_start_date');
+    const endDateInput = document.getElementById('projected_end_date');
+    const bidAmountInput = document.getElementById('bid_amount');
+    const actualCostInput = document.getElementById('actual_cost');
+    const varianceDisplay = document.getElementById('variance-display');
+    
+    function validateDates() {
+        const startDate = new Date(startDateInput.value);
+        const endDate = new Date(endDateInput.value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Validate start date (allow current date in edit mode)
+        if (startDateInput.value && startDate < today) {
+            startDateInput.setCustomValidity('Start date cannot be in the past');
+        } else {
+            startDateInput.setCustomValidity('');
+        }
+        
+        // Validate end date
+        if (endDateInput.value && startDateInput.value && endDate < startDate) {
+            endDateInput.setCustomValidity('End date must be after start date');
+        } else {
+            endDateInput.setCustomValidity('');
+        }
+    }
+    
+    function calculateVariance() {
+        const bidAmount = parseFloat(bidAmountInput.value) || 0;
+        const actualCost = parseFloat(actualCostInput.value) || 0;
+        
+        if (bidAmount > 0 && actualCost > 0) {
+            const variance = actualCost - bidAmount;
+            if (variance > 0) {
+                varianceDisplay.innerHTML = `<span class="text-danger">+$${variance.toFixed(2)}</span>`;
+            } else if (variance < 0) {
+                varianceDisplay.innerHTML = `<span class="text-success">$${variance.toFixed(2)}</span>`;
+            } else {
+                varianceDisplay.innerHTML = `<span class="text-muted">$0.00</span>`;
+            }
+        } else {
+            varianceDisplay.innerHTML = `<em class="text-muted">Enter amounts above</em>`;
+        }
+    }
+    
+    // Calculate initial variance
+    calculateVariance();
+    
+    // Event listeners
+    startDateInput.addEventListener('change', validateDates);
+    endDateInput.addEventListener('change', validateDates);
+    bidAmountInput.addEventListener('input', calculateVariance);
+    actualCostInput.addEventListener('input', calculateVariance);
+});
+</script>
+{% endblock %}
