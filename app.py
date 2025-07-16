@@ -151,6 +151,10 @@ def auth_login():
                 print(f"Failed to send email to {email}")
                 flash('Failed to send email. Please try a real email address (test domains like example.com are not allowed).', 'error')
 
+        except ValueError as ve:
+            # Handle unauthorized email
+            print(f"Unauthorized email attempt: {email}")
+            flash('Access denied. This email is not authorized to use this system.', 'error')
         except Exception as e:
             print(f"Login error: {e}")
             import traceback

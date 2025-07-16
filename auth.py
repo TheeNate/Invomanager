@@ -15,8 +15,28 @@ class MagicLinkAuth:
         self.db = db_manager
         self.token_expiry_hours = 1  # Magic links expire in 1 hour
         
+        # Load allowed emails from environment variable
+        allowed_emails_str = os.environ.get('ALLOWED_EMAILS', '')
+        self.allowed_emails = set(email.strip().lower() for email in allowed_emails_str.split(',') if email.strip())
+        
+        print(f"Allowed emails configured: {len(self.allowed_emails)} emails")
+        if not self.allowed_emails:
+            print("WARNING: No allowed emails configured. Set ALLOWED_EMAILS environment variable.")
+        
+    def is_email_allowed(self, email: str) -> bool:
+        """Check if email is in the allowed list"""
+        if not self.allowed_emails:
+            # If no allowed emails are configured, deny access for security
+            return False
+        
+        return email.lower() in self.allowed_emails
+    
     def generate_magic_link(self, email: str) -> str:
         """Generate a magic link for the given email"""
+        # Check if email is authorized
+        if not self.is_email_allowed(email):
+            raise ValueError("Email not authorized for access")
+        
         # Generate secure token
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
