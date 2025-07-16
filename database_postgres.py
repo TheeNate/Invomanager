@@ -34,12 +34,33 @@ class DatabaseManager:
     def connect(self):
         """Establish database connection"""
         try:
-            connection = psycopg2.connect(self.db_url)
+            # Parse URL to add SSL configuration if needed
+            if self.db_url.startswith('postgresql://'):
+                # Add SSL mode if not already specified
+                if 'sslmode=' not in self.db_url:
+                    separator = '&' if '?' in self.db_url else '?'
+                    db_url = f"{self.db_url}{separator}sslmode=require"
+                else:
+                    db_url = self.db_url
+            else:
+                db_url = self.db_url
+            
+            connection = psycopg2.connect(db_url)
             connection.autocommit = False
             return connection
         except psycopg2.OperationalError as e:
             print(f"Database connection failed: {str(e)}")
-            print(f"Connection URL (masked): {self.db_url[:20]}...")
+            print(f"Connection URL (masked): {db_url[:20] if 'db_url' in locals() else self.db_url[:20]}...")
+            # Try without SSL as fallback
+            try:
+                if 'sslmode=' in db_url:
+                    fallback_url = db_url.replace('sslmode=require', 'sslmode=prefer')
+                    print("Attempting connection with SSL preference instead of requirement...")
+                    connection = psycopg2.connect(fallback_url)
+                    connection.autocommit = False
+                    return connection
+            except Exception as fallback_error:
+                print(f"Fallback connection also failed: {str(fallback_error)}")
             raise
         except Exception as e:
             print(f"Unexpected database error: {str(e)}")
@@ -48,21 +69,42 @@ class DatabaseManager:
     def initialize_database(self):
         """Create all tables and insert initial data"""
         print("Connecting to PostgreSQL database...")
-        conn = self.connect()
+        conn = None
         try:
+            conn = self.connect()
             cursor = conn.cursor()
             print("Creating database tables...")
             self._create_tables(cursor)
             print("Inserting default equipment types...")
             self._insert_default_equipment_types(cursor)
+            
+            # Add auth_tokens table
+            print("Creating authentication tokens table...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auth_tokens (
+                    token VARCHAR(255) PRIMARY KEY,
+                    email VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL
+                )
+            """)
+            
             conn.commit()
             print("Database initialization completed successfully!")
         except Exception as e:
             print(f"Database initialization failed: {str(e)}")
-            conn.rollback()
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass  # Connection might already be closed
             raise
         finally:
-            conn.close()
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass  # Connection might already be closed
     
     def _create_tables(self, cursor):
         """Create all required tables"""
