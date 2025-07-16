@@ -68,8 +68,8 @@ def index():
         type_filter = request.args.get('type', 'All')
         search_term = request.args.get('search', '')
 
-        # Get equipment list with filters
-        equipment_list = db_manager.get_equipment_list()
+        # Get equipment list with inspection data in a single optimized query
+        equipment_list = db_manager.get_equipment_list_with_inspections()
 
         # Apply filters
         if status_filter != 'All':
@@ -90,11 +90,6 @@ def index():
 
         # Get equipment types for filter dropdown
         equipment_types = db_manager.get_equipment_types()
-
-        # Add last inspection info to equipment
-        for equipment in equipment_list:
-            last_inspection = db_manager.get_last_inspection(equipment['equipment_id'])
-            equipment['last_inspection'] = last_inspection
 
         return render_template('index.html', 
                              equipment_list=equipment_list,
