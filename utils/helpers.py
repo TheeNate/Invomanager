@@ -95,7 +95,7 @@ def validate_equipment_type_code(type_code: str) -> bool:
     """Validate equipment type code format"""
     if not type_code:
         return False
-    return len(type_code) >= 1 and len(type_code) <= 2 and type_code.isalpha()
+    return len(type_code) >= 1 and len(type_code) <= 4 and type_code.isalpha()
 
 def normalize_equipment_type_code(type_code: str) -> str:
     """Normalize equipment type code to uppercase"""

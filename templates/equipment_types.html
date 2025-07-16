@@ -98,8 +98,8 @@
                             <div class="mb-3">
                                 <label for="type_code" class="form-label">Type Code <span class="text-danger">*</span></label>
                                 <input type="text" name="type_code" id="type_code" class="form-control" 
-                                       placeholder="e.g., R, H, D" maxlength="2" required>
-                                <div class="form-text">1-2 uppercase letters</div>
+                                       placeholder="e.g., R, H, DESC, ROPE" maxlength="4" required>
+                                <div class="form-text">1-4 uppercase letters</div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -110,13 +110,13 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
                         <input type="text" name="description" id="description" class="form-control" 
                                placeholder="e.g., Rope, Harness, Descender" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="is_soft_goods" 
@@ -130,14 +130,14 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3" id="lifespan-field" style="display: none;">
                         <label for="lifespan_years" class="form-label">Lifespan (Years) <span class="text-danger">*</span></label>
                         <input type="number" name="lifespan_years" id="lifespan_years" 
                                class="form-control" value="10" min="1" max="50">
                         <div class="form-text">Number of years from first use date until expiration</div>
                     </div>
-                    
+
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>
                         <strong>Examples:</strong>
@@ -165,7 +165,7 @@ function toggleLifespanField() {
     const isSoftGoods = document.getElementById('is_soft_goods').checked;
     const lifespanField = document.getElementById('lifespan-field');
     const lifespanInput = document.getElementById('lifespan_years');
-    
+
     if (isSoftGoods) {
         lifespanField.style.display = 'block';
         lifespanInput.required = true;
