@@ -185,6 +185,118 @@ class EquipmentPDFExporter:
         
         return self.create_complete_inventory_pdf(selected_equipment, title)
     
+    def create_job_equipment_pdf(self, job: Dict, equipment_list: List[Dict], 
+                               title: str = "Job Equipment Report") -> bytes:
+        """Create PDF with equipment assigned to a specific job"""
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72
+        )
+        
+        # Build the PDF content
+        story = []
+        
+        # Title
+        story.append(Paragraph(title, self.title_style))
+        story.append(Spacer(1, 20))
+        
+        # Job Information Section
+        job_info_text = f"""
+        <b>Job ID:</b> {job.get('job_id', 'Unknown')}<br/>
+        <b>Customer:</b> {job.get('customer_name', 'Not specified')}<br/>
+        <b>Job Title:</b> {job.get('job_title', 'Not specified')}<br/>
+        <b>Status:</b> {job.get('status', 'Unknown')}<br/>
+        <b>Location:</b> {self._format_job_location(job)}<br/>
+        <b>Start Date:</b> {self._format_date(job.get('projected_start_date'))}<br/>
+        <b>End Date:</b> {self._format_date(job.get('projected_end_date'))}<br/>
+        <b>Generated:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        """
+        
+        story.append(Paragraph(job_info_text, self.styles['Normal']))
+        story.append(Spacer(1, 30))
+        
+        # Equipment section
+        equipment_count = len(equipment_list)
+        equipment_header = f"Assigned Equipment ({equipment_count} items)"
+        story.append(Paragraph(equipment_header, self.header_style))
+        story.append(Spacer(1, 10))
+        
+        if equipment_list:
+            # Create equipment table
+            table_data = [
+                ['Equipment ID', 'Type', 'Name', 'Serial Number', 'Status', 'Service Date']
+            ]
+            
+            for item in sorted(equipment_list, key=lambda x: x.get('equipment_id', '')):
+                service_date = self._format_date(item.get('date_put_in_service'))
+                
+                table_data.append([
+                    item.get('equipment_id', ''),
+                    f"{item.get('equipment_type', '')} - {item.get('type_description', '')}",
+                    item.get('name', 'Not specified'),
+                    item.get('serial_number', 'Not specified'),
+                    self._format_status(item.get('status', 'Unknown')),
+                    service_date
+                ])
+            
+            # Create and style table
+            table = Table(table_data, colWidths=[1.2*inch, 1.8*inch, 1.5*inch, 1.2*inch, 0.8*inch, 1*inch])
+            table.setStyle(TableStyle([
+                # Header row
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#3498db')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                
+                # Data rows
+                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, HexColor('#f8f9fa')]),
+                ('GRID', (0, 0), (-1, -1), 1, HexColor('#dee2e6')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ]))
+            
+            story.append(table)
+        else:
+            story.append(Paragraph("No equipment assigned to this job.", self.styles['Normal']))
+        
+        story.append(Spacer(1, 30))
+        
+        # Footer
+        footer_text = f"Equipment Inventory Management System - Job Equipment Report"
+        story.append(Paragraph(footer_text, self.footer_style))
+        
+        # Build PDF
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_bytes
+    
+    def _format_job_location(self, job: Dict) -> str:
+        """Format job location for display"""
+        city = job.get('location_city', '')
+        state = job.get('location_state', '')
+        
+        if city and state:
+            return f"{city}, {state}"
+        elif city:
+            return city
+        elif state:
+            return state
+        else:
+            return "Not specified"
+    
     def _format_date(self, date_value) -> str:
         """Format date for display"""
         if not date_value:

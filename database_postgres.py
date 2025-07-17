@@ -169,6 +169,19 @@ class DatabaseManager:
             )
         """)
         
+        # Add job_id column if it doesn't exist (for existing databases)
+        cursor.execute("""
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                              WHERE table_name='equipment' AND column_name='job_id') THEN
+                    ALTER TABLE Equipment ADD COLUMN job_id VARCHAR(4);
+                    ALTER TABLE Equipment ADD CONSTRAINT fk_equipment_job 
+                    FOREIGN KEY (job_id) REFERENCES Jobs(job_id);
+                END IF;
+            END $$;
+        """)
+        
         # Inspections table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Inspections (

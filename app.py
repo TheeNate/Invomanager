@@ -958,6 +958,48 @@ def assign_equipment_to_job():
         flash(f'Error assigning equipment to job: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+@app.route('/jobs/<job_id>/equipment_pdf')
+@auth.require_auth
+def export_job_equipment_pdf(job_id):
+    """Export job equipment to PDF"""
+    try:
+        # Get job details
+        job = db_manager.get_job_by_id(job_id)
+        if not job:
+            flash('Job not found', 'error')
+            return redirect(url_for('jobs_dashboard'))
+        
+        # Get job equipment
+        job_equipment = db_manager.get_job_equipment(job_id)
+        
+        if not job_equipment:
+            flash('No equipment assigned to this job', 'warning')
+            return redirect(url_for('job_details', job_id=job_id))
+        
+        # Create PDF
+        from pdf_export import EquipmentPDFExporter
+        exporter = EquipmentPDFExporter()
+        
+        title = f"Equipment Report - Job {job['job_id']}"
+        if job.get('customer_name'):
+            title += f" - {job['customer_name']}"
+        if job.get('job_title'):
+            title += f" ({job['job_title']})"
+        
+        pdf_bytes = exporter.create_job_equipment_pdf(job, job_equipment, title)
+        
+        # Create response
+        from flask import make_response
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="job_{job_id}_equipment_report.pdf"'
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('job_details', job_id=job_id))
+
 @app.route('/jobs/<job_id>/return_equipment', methods=['POST'])
 @auth.require_auth
 def return_equipment_from_job(job_id):
