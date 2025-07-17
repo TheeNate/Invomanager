@@ -359,6 +359,25 @@ def update_equipment_service_date(equipment_id):
         flash(f'Error updating service date: {str(e)}', 'error')
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
+@app.route('/equipment/<path:equipment_id>/update_info', methods=['POST'])
+@auth.require_auth
+def update_equipment_info(equipment_id):
+    """Update equipment information (name and serial number)"""
+    try:
+        name = request.form.get('name', '').strip() or None
+        serial_number = request.form.get('serial_number', '').strip() or None
+
+        if db_manager.update_equipment_info(equipment_id, name, serial_number):
+            flash(f'Equipment information updated successfully for {equipment_id}', 'success')
+        else:
+            flash('Failed to update equipment information', 'error')
+
+        return redirect(url_for('equipment_details', equipment_id=equipment_id))
+
+    except Exception as e:
+        flash(f'Error updating equipment information: {str(e)}', 'error')
+        return redirect(url_for('equipment_details', equipment_id=equipment_id))
+
 @app.route('/equipment/<path:equipment_id>/delete', methods=['POST'])
 @auth.require_auth
 def delete_equipment(equipment_id):

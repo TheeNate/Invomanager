@@ -26,69 +26,149 @@
     <div class="col-md-6">
         <!-- Equipment Information -->
         <div class="card mb-4">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                     <i class="bi bi-info-circle"></i> Equipment Information
                 </h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="editInfoBtn" onclick="toggleEditMode()">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
             </div>
             <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-5">Equipment ID:</dt>
-                    <dd class="col-sm-7"><code>{{ equipment.equipment_id }}</code></dd>
-                    
-                    <dt class="col-sm-5">Name:</dt>
-                    <dd class="col-sm-7">
-                        {{ equipment.name or '<em class="text-muted">Not specified</em>' | safe }}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Type:</dt>
-                    <dd class="col-sm-7">
-                        <span class="badge bg-secondary me-1">{{ equipment.equipment_type }}</span>
-                        {{ equipment.type_description }}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Category:</dt>
-                    <dd class="col-sm-7">
-                        {% if equipment.is_soft_goods %}
-                            <span class="badge bg-warning text-dark">
-                                <i class="bi bi-clock"></i> Soft Goods
-                            </span>
-                            <small class="text-muted d-block">Has expiration date</small>
-                        {% else %}
-                            <span class="badge bg-info">
-                                <i class="bi bi-gear"></i> Hardware
-                            </span>
-                            <small class="text-muted d-block">No expiration</small>
-                        {% endif %}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Serial Number:</dt>
-                    <dd class="col-sm-7">
-                        {{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Date Added to Inventory:</dt>
-                    <dd class="col-sm-7">
-                        {{ equipment.date_added_to_inventory | date_format or '<em class="text-muted">Not specified</em>' | safe }}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Date Put in Service:</dt>
-                    <dd class="col-sm-7">
-                        {{ equipment.date_put_in_service | date_format or '<em class="text-muted">Not yet in service</em>' | safe }}
-                        {% if equipment.is_soft_goods and equipment.date_put_in_service %}
-                            <small class="text-muted d-block">
-                                Expires: {{ (equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
-                            </small>
-                        {% endif %}
-                    </dd>
-                    
-                    <dt class="col-sm-5">Created:</dt>
-                    <dd class="col-sm-7">
-                        <small class="text-muted">{{ equipment.created_at | date_format('%Y-%m-%d %H:%M') }}</small>
-                    </dd>
-                </dl>
+                <!-- Read-only view -->
+                <div id="readOnlyView">
+                    <dl class="row">
+                        <dt class="col-sm-5">Equipment ID:</dt>
+                        <dd class="col-sm-7"><code>{{ equipment.equipment_id }}</code></dd>
+                        
+                        <dt class="col-sm-5">Name:</dt>
+                        <dd class="col-sm-7">
+                            {{ equipment.name or '<em class="text-muted">Not specified</em>' | safe }}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Type:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge bg-secondary me-1">{{ equipment.equipment_type }}</span>
+                            {{ equipment.type_description }}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Category:</dt>
+                        <dd class="col-sm-7">
+                            {% if equipment.is_soft_goods %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-clock"></i> Soft Goods
+                                </span>
+                                <small class="text-muted d-block">Has expiration date</small>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-gear"></i> Hardware
+                                </span>
+                                <small class="text-muted d-block">No expiration</small>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Serial Number:</dt>
+                        <dd class="col-sm-7">
+                            {{ equipment.serial_number or '<em class="text-muted">Not specified</em>' | safe }}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Date Added to Inventory:</dt>
+                        <dd class="col-sm-7">
+                            {{ equipment.date_added_to_inventory | date_format or '<em class="text-muted">Not specified</em>' | safe }}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Date Put in Service:</dt>
+                        <dd class="col-sm-7">
+                            {{ equipment.date_put_in_service | date_format or '<em class="text-muted">Not yet in service</em>' | safe }}
+                            {% if equipment.is_soft_goods and equipment.date_put_in_service %}
+                                <small class="text-muted d-block">
+                                    Expires: {{ (equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
+                                </small>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-5">Created:</dt>
+                        <dd class="col-sm-7">
+                            <small class="text-muted">{{ equipment.created_at | date_format('%Y-%m-%d %H:%M') }}</small>
+                        </dd>
+                    </dl>
+                </div>
+
+                <!-- Edit form -->
+                <div id="editView" style="display: none;">
+                    <form method="POST" action="{{ url_for('update_equipment_info', equipment_id=equipment.equipment_id) }}">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="equipment_id_display" class="form-label">Equipment ID</label>
+                                    <input type="text" class="form-control" id="equipment_id_display" 
+                                           value="{{ equipment.equipment_id }}" readonly disabled>
+                                    <div class="form-text">Equipment ID cannot be changed</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Name</label>
+                                    <input type="text" name="name" id="name" class="form-control" 
+                                           value="{{ equipment.name or '' }}" placeholder="Enter equipment name">
+                                    <div class="form-text">Optional descriptive name for this equipment</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="serial_number" class="form-label">Serial Number</label>
+                                    <input type="text" name="serial_number" id="serial_number" class="form-control" 
+                                           value="{{ equipment.serial_number or '' }}" placeholder="Enter serial number">
+                                    <div class="form-text">Manufacturer's serial number or unique identifier</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <div class="form-control-plaintext">
+                                        <span class="badge bg-secondary me-1">{{ equipment.equipment_type }}</span>
+                                        {{ equipment.type_description }}
+                                        <small class="text-muted d-block">Equipment type cannot be changed</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Save Changes
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="toggleEditMode()">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
+
+        <script>
+        function toggleEditMode() {
+            const readOnlyView = document.getElementById('readOnlyView');
+            const editView = document.getElementById('editView');
+            const editBtn = document.getElementById('editInfoBtn');
+            
+            if (readOnlyView.style.display === 'none') {
+                // Switch to read-only mode
+                readOnlyView.style.display = 'block';
+                editView.style.display = 'none';
+                editBtn.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+            } else {
+                // Switch to edit mode
+                readOnlyView.style.display = 'none';
+                editView.style.display = 'block';
+                editBtn.innerHTML = '<i class="bi bi-eye"></i> View';
+            }
+        }
+        </script>
 
         <!-- Service Date Management -->
         <div class="card mb-4">

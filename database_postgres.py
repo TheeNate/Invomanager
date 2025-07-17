@@ -445,6 +445,27 @@ class DatabaseManager:
         finally:
             conn.close()
     
+    def update_equipment_info(self, equipment_id: str, name: str = None, serial_number: str = None) -> bool:
+        """Update equipment name and serial number"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE Equipment 
+                SET name = %s, serial_number = %s
+                WHERE equipment_id = %s
+            """, (name, serial_number, equipment_id))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            print(f"Error updating equipment info: {e}")
+            return False
+        finally:
+            conn.close()
+    
     def add_inspection(self, equipment_id: str, inspection_date: date, result: str, 
                       inspector_name: str, notes: str = None) -> int:
         """Add inspection record and update equipment status if failed"""
