@@ -278,12 +278,16 @@ function createGroupRow(type, items, typeDescription) {
 function createEquipmentRow(equipment) {
     const statusColorMap = {
         'ACTIVE': 'success',
+        'IN_FIELD': 'info',
+        'WAREHOUSE': 'secondary',
         'RED_TAGGED': 'warning',
         'DESTROYED': 'danger'
     };
     
     const statusIconMap = {
         'ACTIVE': 'check-circle',
+        'IN_FIELD': 'geo-alt',
+        'WAREHOUSE': 'building',
         'RED_TAGGED': 'exclamation-triangle',
         'DESTROYED': 'x-circle'
     };
@@ -323,7 +327,7 @@ function createEquipmentRow(equipment) {
             </a>
     `;
     
-    if (equipment.status === 'ACTIVE') {
+    if (equipment.status === 'ACTIVE' || equipment.status === 'IN_FIELD' || equipment.status === 'WAREHOUSE') {
         actionsHtml += `
             <a href="${addInspectionUrl}" class="btn btn-outline-success" title="Add Inspection">
                 <i class="bi bi-clipboard-check"></i>

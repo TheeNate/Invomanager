@@ -45,7 +45,12 @@
                             {% if active_equipment %}
                                 <div class="form-text">
                                     Found {{ active_equipment|length }} active equipment items.
-                                    {% set type_001_items = active_equipment|selectattr('equipment_id', 'match', '.*\/001$')|list %}
+                                    {% set type_001_items = [] %}
+                                    {% for item in active_equipment %}
+                                        {% if item.equipment_id.endswith('/001') %}
+                                            {% set _ = type_001_items.append(item) %}
+                                        {% endif %}
+                                    {% endfor %}
                                     Items ending with /001: {{ type_001_items|length }}
                                     {% if type_001_items %}
                                         <br>Sample /001 items: 

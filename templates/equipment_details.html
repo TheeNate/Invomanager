@@ -14,7 +14,7 @@
         <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to List
         </a>
-        {% if equipment.status == 'ACTIVE' %}
+        {% if equipment.status in ['ACTIVE', 'IN_FIELD', 'WAREHOUSE'] %}
             <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" class="btn btn-primary">
                 <i class="bi bi-clipboard-check"></i> Add Inspection
             </a>
@@ -254,7 +254,7 @@
                 <h5 class="card-title mb-0">
                     <i class="bi bi-clipboard-check"></i> Inspection History
                 </h5>
-                {% if equipment.status == 'ACTIVE' %}
+                {% if equipment.status in ['ACTIVE', 'IN_FIELD', 'WAREHOUSE'] %}
                     <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}" 
                        class="btn btn-sm btn-primary">
                         <i class="bi bi-plus"></i> Add Inspection
@@ -310,12 +310,12 @@
                         <i class="bi bi-clipboard-x display-4 text-muted"></i>
                         <h6 class="text-muted mt-2">No inspections recorded</h6>
                         <p class="text-muted small mb-0">
-                            {% if equipment.status == 'ACTIVE' %}
+                            {% if equipment.status in ['ACTIVE', 'IN_FIELD', 'WAREHOUSE'] %}
                                 <a href="{{ url_for('add_inspection', equipment_id=equipment.equipment_id) }}">
                                     Record the first inspection
                                 </a>
                             {% else %}
-                                Equipment is not active for inspection
+                                Equipment is not available for inspection
                             {% endif %}
                         </p>
                     </div>
