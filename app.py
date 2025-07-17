@@ -453,7 +453,15 @@ def add_inspection(equipment_id=None):
             flash(f'Error adding inspection: {str(e)}', 'error')
 
     # GET request - show form
-    active_equipment = db_manager.get_equipment_list(status_filter='ACTIVE')
+    try:
+        active_equipment = db_manager.get_equipment_list(status_filter='ACTIVE')
+        print(f"Debug: Found {len(active_equipment)} active equipment items")
+        for eq in active_equipment:
+            print(f"Debug: Equipment ID: {eq.get('equipment_id')}, Type: {eq.get('equipment_type')}")
+    except Exception as e:
+        print(f"Error loading active equipment: {e}")
+        active_equipment = []
+    
     return render_template('add_inspection.html', 
                          active_equipment=active_equipment,
                          selected_equipment_id=equipment_id,

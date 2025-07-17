@@ -31,15 +31,29 @@
                             </div>
                         {% else %}
                             <select name="equipment_id" id="equipment_id" class="form-select" required>
-                                <option value="">Select equipment to inspect...</option>
+                                <option value="">Select Equipment...</option>
                                 {% for equipment in active_equipment %}
                                     <option value="{{ equipment.equipment_id }}" 
-                                            {{ 'selected' if form_data and form_data.equipment_id == equipment.equipment_id }}>
-                                        {{ equipment.equipment_id }} - {{ equipment.type_description }}
-                                        {% if equipment.serial_number %}(S/N: {{ equipment.serial_number }}){% endif %}
+                                        {{ 'selected' if equipment.equipment_id == selected_equipment_id }}>
+                                        {{ equipment.equipment_id }} - {{ equipment.get('type_description', 'Unknown Type') }}
+                                        {% if equipment.get('serial_number') %}(S/N: {{ equipment.serial_number }}){% endif %}
                                     </option>
                                 {% endfor %}
                             </select>
+
+                            <!-- Debug info (remove in production) -->
+                            {% if active_equipment %}
+                                <div class="form-text">
+                                    Found {{ active_equipment|length }} active equipment items.
+                                    {% if not active_equipment %}
+                                        No equipment available for inspection.
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="form-text text-warning">
+                                    No active equipment found. Please check equipment status.
+                                </div>
+                            {% endif %}
                         {% endif %}
                     </div>
 
@@ -91,7 +105,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div id="fail-warning" class="alert alert-warning mt-3" style="display: none;">
                             <i class="bi bi-exclamation-triangle"></i>
                             <strong>Warning:</strong> Failed inspections will automatically RED TAG the equipment. 
@@ -142,16 +156,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     const resultRadios = document.querySelectorAll('input[name="result"]');
     const failWarning = document.getElementById('fail-warning');
-    
+
     function toggleFailWarning() {
         const failSelected = document.getElementById('result_fail').checked;
         failWarning.style.display = failSelected ? 'block' : 'none';
     }
-    
+
     resultRadios.forEach(radio => {
         radio.addEventListener('change', toggleFailWarning);
     });
-    
+
     // Check initial state
     toggleFailWarning();
 });
