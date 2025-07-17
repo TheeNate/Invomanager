@@ -456,8 +456,17 @@ def add_inspection(equipment_id=None):
     try:
         active_equipment = db_manager.get_equipment_list(status_filter='ACTIVE')
         print(f"Debug: Found {len(active_equipment)} active equipment items")
-        for eq in active_equipment:
-            print(f"Debug: Equipment ID: {eq.get('equipment_id')}, Type: {eq.get('equipment_type')}")
+        
+        # Check specifically for /001 items
+        type_001_items = [eq for eq in active_equipment if eq.get('equipment_id', '').endswith('/001')]
+        print(f"Debug: Found {len(type_001_items)} items ending with /001")
+        for eq in type_001_items:
+            print(f"Debug: /001 Item - ID: {eq.get('equipment_id')}, Status: {eq.get('status')}, Type: {eq.get('equipment_type')}")
+        
+        # Show first 10 items for debugging
+        for i, eq in enumerate(active_equipment[:10]):
+            print(f"Debug: Equipment {i+1}: ID: {eq.get('equipment_id')}, Type: {eq.get('equipment_type')}, Status: {eq.get('status')}")
+            
     except Exception as e:
         print(f"Error loading active equipment: {e}")
         active_equipment = []

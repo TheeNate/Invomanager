@@ -300,7 +300,7 @@ class DatabaseManager:
                 query += " AND e.equipment_type = %s"
                 params.append(type_filter)
 
-            query += " ORDER BY e.equipment_id"
+            query += " ORDER BY e.equipment_type, CAST(split_part(e.equipment_id, '/', 2) AS INTEGER)"
 
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]

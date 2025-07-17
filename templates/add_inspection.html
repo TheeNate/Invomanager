@@ -45,8 +45,13 @@
                             {% if active_equipment %}
                                 <div class="form-text">
                                     Found {{ active_equipment|length }} active equipment items.
-                                    {% if not active_equipment %}
-                                        No equipment available for inspection.
+                                    {% set type_001_items = active_equipment|selectattr('equipment_id', 'match', '.*\/001$')|list %}
+                                    Items ending with /001: {{ type_001_items|length }}
+                                    {% if type_001_items %}
+                                        <br>Sample /001 items: 
+                                        {% for item in type_001_items[:3] %}
+                                            {{ item.equipment_id }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
                                     {% endif %}
                                 </div>
                             {% else %}
