@@ -354,19 +354,8 @@ function markJobComplete() {
 }
 
 function generateInvoice() {
-    // Get the first equipment item assigned to this job for invoice creation
-    const equipmentRows = document.querySelectorAll('tr[data-equipment-id]');
-    
-    if (equipmentRows.length === 0) {
-        alert('No equipment assigned to this job. Please assign equipment before generating an invoice.');
-        return;
-    }
-    
-    // Use the first equipment item for invoice creation
-    const firstEquipmentId = equipmentRows[0].getAttribute('data-equipment-id');
-    
-    // Redirect to invoice creation page
-    window.location.href = `/invoice/create/${firstEquipmentId}`;
+    // Redirect to invoice creation page for this job
+    window.location.href = `/invoice/create/job/{{ job.job_id }}`;
 }
 </script>
 {% endblock %}
