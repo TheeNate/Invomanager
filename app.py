@@ -1067,15 +1067,9 @@ def delete_job(job_id):
         job = db_manager.get_job_by_id(job_id)
         if not job:
             flash('Job not found', 'error')
-            return redirect(url_for('jobs_list'))
+            return redirect(url_for('jobs_dashboard'))
         
-        # Return all equipment from the job before deletion
-        equipment_list = db_manager.get_equipment_by_job(job_id)
-        if equipment_list:
-            equipment_ids = [eq['equipment_id'] for eq in equipment_list]
-            db_manager.return_equipment_from_job(equipment_ids)
-        
-        # Delete the job
+        # Delete the job (the delete_job method handles equipment return automatically)
         success = db_manager.delete_job(job_id)
         
         if success:
@@ -1083,11 +1077,11 @@ def delete_job(job_id):
         else:
             flash('Failed to delete job', 'error')
             
-        return redirect(url_for('jobs_list'))
+        return redirect(url_for('jobs_dashboard'))
         
     except Exception as e:
         flash(f'Error deleting job: {str(e)}', 'error')
-        return redirect(url_for('jobs_list'))
+        return redirect(url_for('jobs_dashboard'))
 
 # Invoice Management Routes
 
