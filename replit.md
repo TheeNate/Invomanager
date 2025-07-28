@@ -138,6 +138,7 @@ Preferred communication style: Simple, everyday language.
 - **July 28, 2025**: Added invoice management dashboard with status filtering and summary statistics
 - **July 28, 2025**: Added "Invoices" menu item to main navigation for easy access
 - **July 28, 2025**: Removed due date field from invoice system per user request - invoices now only track invoice date
+- **July 28, 2025**: Added job deletion functionality with automatic equipment return and invoice cleanup
 
 ### Future Scalability
 - Authentication system can be added for user management

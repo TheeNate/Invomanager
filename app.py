@@ -1058,6 +1058,37 @@ def api_active_jobs():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/job/<job_id>/delete', methods=['POST'])
+@auth.require_auth
+def delete_job(job_id):
+    """Delete a job and return all associated equipment"""
+    try:
+        # Check if job exists
+        job = db_manager.get_job_by_id(job_id)
+        if not job:
+            flash('Job not found', 'error')
+            return redirect(url_for('jobs_list'))
+        
+        # Return all equipment from the job before deletion
+        equipment_list = db_manager.get_equipment_by_job(job_id)
+        if equipment_list:
+            equipment_ids = [eq['equipment_id'] for eq in equipment_list]
+            db_manager.return_equipment_from_job(equipment_ids)
+        
+        # Delete the job
+        success = db_manager.delete_job(job_id)
+        
+        if success:
+            flash(f'Job {job_id} has been deleted successfully', 'success')
+        else:
+            flash('Failed to delete job', 'error')
+            
+        return redirect(url_for('jobs_list'))
+        
+    except Exception as e:
+        flash(f'Error deleting job: {str(e)}', 'error')
+        return redirect(url_for('jobs_list'))
+
 # Invoice Management Routes
 
 @app.route('/invoice/create/<path:equipment_id>')

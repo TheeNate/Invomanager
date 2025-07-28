@@ -1074,6 +1074,36 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def delete_job(self, job_id: str) -> bool:
+        """Delete a job and all associated data"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # First, return all equipment from this job to ACTIVE status
+            cursor.execute("""
+                UPDATE Equipment 
+                SET status = 'ACTIVE', job_id = NULL 
+                WHERE job_id = %s
+            """, (job_id,))
+            
+            # Delete any invoices associated with this job
+            cursor.execute("DELETE FROM Invoice_Line_Items WHERE invoice_id IN (SELECT invoice_id FROM Invoices WHERE job_number = %s)", (job_id,))
+            cursor.execute("DELETE FROM Invoices WHERE job_number = %s", (job_id,))
+            
+            # Delete the job
+            cursor.execute("DELETE FROM Jobs WHERE job_id = %s", (job_id,))
+            
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error deleting job: {str(e)}")
+        finally:
+            conn.close()
+
     # Invoice management methods
     def generate_invoice_number(self) -> str:
         """Generate next invoice number in format INV-YYYY-001"""
