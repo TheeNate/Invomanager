@@ -1058,6 +1058,155 @@ def api_active_jobs():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Invoice Management Routes
+
+@app.route('/invoice/create/<equipment_id>')
+@auth.require_auth
+def create_invoice(equipment_id):
+    """Create new invoice form"""
+    try:
+        # Get equipment details
+        equipment = db_manager.get_equipment_by_id(equipment_id)
+        if not equipment:
+            flash('Equipment not found', 'error')
+            return redirect(url_for('index'))
+
+        # Get job details if equipment is assigned to a job
+        job = None
+        if equipment.get('job_id'):
+            job = db_manager.get_job_by_id(equipment['job_id'])
+
+        return render_template('create_invoice.html', 
+                             equipment=equipment,
+                             job=job,
+                             today=date.today().strftime('%Y-%m-%d'))
+
+    except Exception as e:
+        flash(f'Error loading invoice form: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/invoice/save', methods=['POST'])
+@auth.require_auth
+def save_invoice():
+    """Save invoice with line items"""
+    try:
+        # Get form data
+        equipment_id = request.form.get('equipment_id')
+        job_number = request.form.get('job_number')
+        invoice_date = request.form.get('invoice_date')
+        due_date = request.form.get('due_date')
+        tax_rate = float(request.form.get('tax_rate', 0))
+        
+        # Issued to data
+        issued_to_data = {
+            'name': request.form.get('issued_to_name'),
+            'company': request.form.get('issued_to_company'),
+            'address': request.form.get('issued_to_address')
+        }
+        
+        # Pay to data
+        pay_to_data = {
+            'name': request.form.get('pay_to_name'),
+            'company': request.form.get('pay_to_company'),
+            'address': request.form.get('pay_to_address')
+        }
+        
+        # Create invoice
+        invoice_id = db_manager.create_invoice(
+            equipment_id, job_number, issued_to_data, pay_to_data, 
+            invoice_date, due_date
+        )
+        
+        # Add line items
+        line_descriptions = request.form.getlist('line_description[]')
+        line_prices = request.form.getlist('line_price[]')
+        line_quantities = request.form.getlist('line_quantity[]')
+        
+        for i, description in enumerate(line_descriptions):
+            if description.strip():  # Only add non-empty line items
+                unit_price = float(line_prices[i])
+                quantity = int(line_quantities[i])
+                db_manager.add_invoice_line_item(invoice_id, description, unit_price, quantity)
+        
+        # Update totals with tax
+        db_manager.update_invoice_totals(invoice_id, tax_rate)
+        
+        # Update status if specified
+        if request.form.get('action') == 'finalize':
+            db_manager.update_invoice_status(invoice_id, 'SENT')
+        
+        flash('Invoice created successfully', 'success')
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        
+    except Exception as e:
+        flash(f'Error saving invoice: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/invoice/<int:invoice_id>')
+@auth.require_auth
+def view_invoice(invoice_id):
+    """View/print invoice"""
+    try:
+        invoice = db_manager.get_invoice_by_id(invoice_id)
+        if not invoice:
+            flash('Invoice not found', 'error')
+            return redirect(url_for('invoices_list'))
+        
+        return render_template('view_invoice.html', invoice=invoice)
+        
+    except Exception as e:
+        flash(f'Error loading invoice: {str(e)}', 'error')
+        return redirect(url_for('invoices_list'))
+
+@app.route('/invoices')
+@auth.require_auth
+def invoices_list():
+    """List all invoices"""
+    try:
+        status_filter = request.args.get('status')
+        invoices = db_manager.get_invoices_list(status_filter)
+        
+        return render_template('invoices_list.html', 
+                             invoices=invoices,
+                             current_filter=status_filter)
+        
+    except Exception as e:
+        flash(f'Error loading invoices: {str(e)}', 'error')
+        return render_template('invoices_list.html', invoices=[])
+
+@app.route('/invoice/<int:invoice_id>/status', methods=['POST'])
+@auth.require_auth
+def update_invoice_status_route(invoice_id):
+    """Update invoice status"""
+    try:
+        status = request.form.get('status')
+        if db_manager.update_invoice_status(invoice_id, status):
+            flash(f'Invoice status updated to {status}', 'success')
+        else:
+            flash('Error updating invoice status', 'error')
+        
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        
+    except Exception as e:
+        flash(f'Error updating invoice status: {str(e)}', 'error')
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
+
+@app.route('/invoice/<int:invoice_id>/delete', methods=['POST'])
+@auth.require_auth
+def delete_invoice_route(invoice_id):
+    """Delete invoice"""
+    try:
+        if db_manager.delete_invoice(invoice_id):
+            flash('Invoice deleted successfully', 'success')
+        else:
+            flash('Error deleting invoice', 'error')
+        
+        return redirect(url_for('invoices_list'))
+        
+    except Exception as e:
+        flash(f'Error deleting invoice: {str(e)}', 'error')
+        return redirect(url_for('invoices_list'))
+
 if __name__ == '__main__':
     # Use production mode for deployment
     debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'

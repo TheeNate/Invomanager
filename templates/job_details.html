@@ -119,7 +119,7 @@
                                 </thead>
                                 <tbody>
                                     {% for equipment in job_equipment %}
-                                    <tr>
+                                    <tr data-equipment-id="{{ equipment.equipment_id }}">
                                         <td>
                                             <input type="checkbox" class="form-check-input equipment-checkbox" 
                                                    value="{{ equipment.equipment_id }}">
@@ -347,7 +347,19 @@ function markJobComplete() {
 }
 
 function generateInvoice() {
-    alert('Invoice generation feature will be implemented in a future update.');
+    // Get the first equipment item assigned to this job for invoice creation
+    const equipmentRows = document.querySelectorAll('tr[data-equipment-id]');
+    
+    if (equipmentRows.length === 0) {
+        alert('No equipment assigned to this job. Please assign equipment before generating an invoice.');
+        return;
+    }
+    
+    // Use the first equipment item for invoice creation
+    const firstEquipmentId = equipmentRows[0].getAttribute('data-equipment-id');
+    
+    // Redirect to invoice creation page
+    window.location.href = `/invoice/create/${firstEquipmentId}`;
 }
 </script>
 {% endblock %}

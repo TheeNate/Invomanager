@@ -1073,3 +1073,235 @@ class DatabaseManager:
             return stats
         finally:
             conn.close()
+
+    # Invoice management methods
+    def generate_invoice_number(self) -> str:
+        """Generate next invoice number in format INV-YYYY-001"""
+        from datetime import datetime
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            year = datetime.now().year
+            cursor.execute("""
+                SELECT MAX(CAST(SUBSTRING(invoice_number FROM 'INV-%s-(.*)') AS INTEGER))
+                FROM Invoices WHERE invoice_number LIKE %s
+            """, (year, f'INV-{year}-%'))
+            
+            result = cursor.fetchone()
+            next_num = (result[0] or 0) + 1
+            return f"INV-{year}-{next_num:03d}"
+        finally:
+            conn.close()
+
+    def create_invoice(self, equipment_id: str, job_number: str, issued_to_data: dict, pay_to_data: dict, invoice_date: str = None, due_date: str = None) -> int:
+        """Create new invoice and return invoice_id"""
+        from datetime import datetime, timedelta
+        
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Generate invoice number
+            invoice_number = self.generate_invoice_number()
+            
+            # Set dates if not provided
+            if not invoice_date:
+                invoice_date = datetime.now().date()
+            if not due_date:
+                due_date = datetime.now().date() + timedelta(days=30)
+            
+            cursor.execute("""
+                INSERT INTO Invoices (
+                    invoice_number, equipment_id, job_number, invoice_date, due_date,
+                    issued_to_name, issued_to_company, issued_to_address,
+                    pay_to_name, pay_to_company, pay_to_address
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING invoice_id
+            """, (
+                invoice_number, equipment_id, job_number, invoice_date, due_date,
+                issued_to_data.get('name'), issued_to_data.get('company'), issued_to_data.get('address'),
+                pay_to_data.get('name'), pay_to_data.get('company'), pay_to_data.get('address')
+            ))
+            
+            invoice_id = cursor.fetchone()[0]
+            conn.commit()
+            return invoice_id
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error creating invoice: {str(e)}")
+        finally:
+            conn.close()
+
+    def add_invoice_line_item(self, invoice_id: int, description: str, unit_price: float, quantity: int) -> int:
+        """Add line item to invoice"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            line_total = unit_price * quantity
+            
+            cursor.execute("""
+                INSERT INTO Invoice_Line_Items (invoice_id, description, unit_price, quantity, line_total)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING line_item_id
+            """, (invoice_id, description, unit_price, quantity, line_total))
+            
+            line_item_id = cursor.fetchone()[0]
+            conn.commit()
+            
+            # Update invoice totals
+            self.update_invoice_totals(invoice_id)
+            
+            return line_item_id
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error adding invoice line item: {str(e)}")
+        finally:
+            conn.close()
+
+    def update_invoice_totals(self, invoice_id: int, tax_rate: float = 0) -> bool:
+        """Recalculate and update invoice totals"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Calculate subtotal from line items
+            cursor.execute("""
+                SELECT COALESCE(SUM(line_total), 0) FROM Invoice_Line_Items WHERE invoice_id = %s
+            """, (invoice_id,))
+            subtotal = cursor.fetchone()[0]
+            
+            # Calculate tax and total
+            tax_amount = subtotal * (tax_rate / 100)
+            total_amount = subtotal + tax_amount
+            
+            # Update invoice
+            cursor.execute("""
+                UPDATE Invoices 
+                SET subtotal = %s, tax_rate = %s, tax_amount = %s, total_amount = %s
+                WHERE invoice_id = %s
+            """, (subtotal, tax_rate, tax_amount, total_amount, invoice_id))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error updating invoice totals: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_invoice_by_id(self, invoice_id: int) -> dict:
+        """Get complete invoice with line items"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Get invoice details
+            cursor.execute("""
+                SELECT i.*, e.name as equipment_name, e.equipment_type, j.customer_name, j.job_title
+                FROM Invoices i
+                LEFT JOIN Equipment e ON i.equipment_id = e.equipment_id
+                LEFT JOIN Jobs j ON i.job_number = j.job_id
+                WHERE i.invoice_id = %s
+            """, (invoice_id,))
+            
+            invoice_row = cursor.fetchone()
+            if not invoice_row:
+                return None
+                
+            columns = [desc[0] for desc in cursor.description]
+            invoice = dict(zip(columns, invoice_row))
+            
+            # Get line items
+            cursor.execute("""
+                SELECT * FROM Invoice_Line_Items WHERE invoice_id = %s ORDER BY line_item_id
+            """, (invoice_id,))
+            
+            line_items = []
+            for row in cursor.fetchall():
+                line_columns = [desc[0] for desc in cursor.description]
+                line_items.append(dict(zip(line_columns, row)))
+            
+            invoice['line_items'] = line_items
+            return invoice
+            
+        except Exception as e:
+            raise Exception(f"Error getting invoice: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_invoices_list(self, status_filter: str = None) -> list:
+        """Get list of all invoices with basic info"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            query = """
+                SELECT i.invoice_id, i.invoice_number, i.job_number, i.invoice_date, 
+                       i.due_date, i.total_amount, i.status, i.issued_to_name, i.issued_to_company,
+                       j.customer_name, j.job_title
+                FROM Invoices i
+                LEFT JOIN Jobs j ON i.job_number = j.job_id
+            """
+            
+            params = []
+            if status_filter:
+                query += " WHERE i.status = %s"
+                params.append(status_filter)
+                
+            query += " ORDER BY i.created_at DESC"
+            
+            cursor.execute(query, params)
+            
+            invoices = []
+            for row in cursor.fetchall():
+                columns = [desc[0] for desc in cursor.description]
+                invoices.append(dict(zip(columns, row)))
+            
+            return invoices
+            
+        except Exception as e:
+            raise Exception(f"Error getting invoices list: {str(e)}")
+        finally:
+            conn.close()
+
+    def update_invoice_status(self, invoice_id: int, status: str) -> bool:
+        """Update invoice status"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Invoices SET status = %s WHERE invoice_id = %s
+            """, (status, invoice_id))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error updating invoice status: {str(e)}")
+        finally:
+            conn.close()
+
+    def delete_invoice(self, invoice_id: int) -> bool:
+        """Delete invoice and all line items"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Delete line items first (CASCADE should handle this, but being explicit)
+            cursor.execute("DELETE FROM Invoice_Line_Items WHERE invoice_id = %s", (invoice_id,))
+            
+            # Delete invoice
+            cursor.execute("DELETE FROM Invoices WHERE invoice_id = %s", (invoice_id,))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Error deleting invoice: {str(e)}")
+        finally:
+            conn.close()

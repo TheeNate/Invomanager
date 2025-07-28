@@ -127,6 +127,16 @@ Preferred communication style: Simple, everyday language.
 - **July 15, 2025**: Added bulk "Put in Service" functionality using checkbox selection from main equipment list
 - **July 15, 2025**: Created modal interface for bulk service date updates with date picker
 - **July 15, 2025**: Implemented efficient workflow for putting multiple equipment items in service simultaneously
+- **July 28, 2025**: Fixed template errors in add_inspection.html and updated status logic for equipment inspections
+- **July 28, 2025**: Updated inspection button logic to support ACTIVE, IN_FIELD, and WAREHOUSE equipment statuses
+- **July 28, 2025**: Enhanced equipment status mapping with proper icons and colors for all status types
+- **July 28, 2025**: Implemented comprehensive invoice generation system with PostgreSQL backend
+- **July 28, 2025**: Created Invoices and Invoice_Line_Items database tables with proper relationships
+- **July 28, 2025**: Added complete invoice management functionality: create, view, edit, delete, and status tracking
+- **July 28, 2025**: Built professional invoice templates with clean design and print functionality
+- **July 28, 2025**: Integrated invoice generation from job details page with automatic equipment context
+- **July 28, 2025**: Added invoice management dashboard with status filtering and summary statistics
+- **July 28, 2025**: Added "Invoices" menu item to main navigation for easy access
 
 ### Future Scalability
 - Authentication system can be added for user management

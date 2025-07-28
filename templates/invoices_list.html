@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-receipt-cutoff"></i> Invoice Management</h2>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('invoices_list') }}" 
+                                   class="btn btn-{{ 'primary' if not current_filter else 'outline-primary' }}">
+                                    All Invoices
+                                </a>
+                                <a href="{{ url_for('invoices_list', status='DRAFT') }}" 
+                                   class="btn btn-{{ 'primary' if current_filter == 'DRAFT' else 'outline-primary' }}">
+                                    Draft
+                                </a>
+                                <a href="{{ url_for('invoices_list', status='SENT') }}" 
+                                   class="btn btn-{{ 'primary' if current_filter == 'SENT' else 'outline-primary' }}">
+                                    Sent
+                                </a>
+                                <a href="{{ url_for('invoices_list', status='PAID') }}" 
+                                   class="btn btn-{{ 'primary' if current_filter == 'PAID' else 'outline-primary' }}">
+                                    Paid
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <!-- Summary Statistics -->
+                            {% set draft_count = invoices | selectattr('status', 'equalto', 'DRAFT') | list | length %}
+                            {% set sent_count = invoices | selectattr('status', 'equalto', 'SENT') | list | length %}
+                            {% set paid_count = invoices | selectattr('status', 'equalto', 'PAID') | list | length %}
+                            {% set total_amount = invoices | sum(attribute='total_amount') %}
+                            
+                            <small class="text-muted">
+                                Total: {{ invoices | length }} invoices | 
+                                {{ draft_count }} draft, {{ sent_count }} sent, {{ paid_count }} paid |
+                                Total Value: ${{ "%.2f"|format(total_amount or 0) }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoices Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list"></i> 
+                        {% if current_filter %}
+                            {{ current_filter.title() }} Invoices
+                        {% else %}
+                            All Invoices
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if invoices %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th>Due Date</th>
+                                        <th>Customer</th>
+                                        <th>Job</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invoice in invoices %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('view_invoice', invoice_id=invoice.invoice_id) }}" 
+                                               class="text-decoration-none fw-bold">
+                                                {{ invoice.invoice_number }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            {{ invoice.invoice_date.strftime('%m/%d/%Y') if invoice.invoice_date else 'N/A' }}
+                                        </td>
+                                        <td>
+                                            {% if invoice.due_date %}
+                                                {% set days_until_due = (invoice.due_date - today).days if today else 0 %}
+                                                <span class="{% if invoice.status == 'SENT' and days_until_due < 0 %}text-danger{% elif invoice.status == 'SENT' and days_until_due <= 7 %}text-warning{% endif %}">
+                                                    {{ invoice.due_date.strftime('%m/%d/%Y') }}
+                                                    {% if invoice.status == 'SENT' and days_until_due < 0 %}
+                                                        <small>({{ -days_until_due }} days overdue)</small>
+                                                    {% elif invoice.status == 'SENT' and days_until_due <= 7 %}
+                                                        <small>(due in {{ days_until_due }} days)</small>
+                                                    {% endif %}
+                                                </span>
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if invoice.issued_to_company %}
+                                                <div class="fw-medium">{{ invoice.issued_to_company }}</div>
+                                            {% endif %}
+                                            {% if invoice.issued_to_name %}
+                                                <small class="text-muted">{{ invoice.issued_to_name }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if invoice.job_number %}
+                                                <span class="badge bg-secondary">{{ invoice.job_number }}</span>
+                                                {% if invoice.job_title %}
+                                                    <br><small class="text-muted">{{ invoice.job_title }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">No job</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end fw-bold">
+                                            ${{ "%.2f"|format(invoice.total_amount or 0) }}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if invoice.status == 'PAID' else ('primary' if invoice.status == 'SENT' else 'secondary') }}">
+                                                {{ invoice.status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{{ url_for('view_invoice', invoice_id=invoice.invoice_id) }}" 
+                                                   class="btn btn-outline-primary" title="View Invoice">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                {% if invoice.status == 'DRAFT' %}
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                                            data-bs-toggle="dropdown" title="Actions">
+                                                        <i class="bi bi-gear"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <form method="POST" action="{{ url_for('update_invoice_status_route', invoice_id=invoice.invoice_id) }}" style="display: inline;">
+                                                                <input type="hidden" name="status" value="SENT">
+                                                                <button type="submit" class="dropdown-item">
+                                                                    <i class="bi bi-send"></i> Mark as Sent
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <form method="POST" action="{{ url_for('delete_invoice_route', invoice_id=invoice.invoice_id) }}" 
+                                                                  onsubmit="return confirm('Are you sure you want to delete this invoice?')" style="display: inline;">
+                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                    <i class="bi bi-trash"></i> Delete
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                                {% elif invoice.status == 'SENT' %}
+                                                <form method="POST" action="{{ url_for('update_invoice_status_route', invoice_id=invoice.invoice_id) }}" style="display: inline;">
+                                                    <input type="hidden" name="status" value="PAID">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Mark as Paid">
+                                                        <i class="bi bi-check-circle"></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-receipt display-1 text-muted"></i>
+                            <h4 class="text-muted mt-3">No invoices found</h4>
+                            <p class="text-muted">
+                                {% if current_filter %}
+                                    No {{ current_filter.lower() }} invoices found. <a href="{{ url_for('invoices_list') }}">View all invoices</a>
+                                {% else %}
+                                    Create your first invoice from the equipment or job pages.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Set today's date for due date calculations
+const today = new Date('{{ "now"|date }}');
+</script>
+{% endblock %}

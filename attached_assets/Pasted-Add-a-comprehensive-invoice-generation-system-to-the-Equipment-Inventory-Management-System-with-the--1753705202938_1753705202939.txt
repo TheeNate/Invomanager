@@ -1,0 +1,126 @@
+Add a comprehensive invoice generation system to the Equipment Inventory Management System with the following specifications:
+Database Schema Updates
+Create two new tables:
+-- Invoices table
+CREATE TABLE IF NOT EXISTS Invoices (
+    invoice_id SERIAL PRIMARY KEY,
+    invoice_number VARCHAR(20) UNIQUE NOT NULL,
+    equipment_id VARCHAR(8),
+    job_number VARCHAR(50),
+    invoice_date DATE NOT NULL,
+    due_date DATE NOT NULL,
+    issued_to_name VARCHAR(100),
+    issued_to_company VARCHAR(100),
+    issued_to_address TEXT,
+    pay_to_name VARCHAR(100),
+    pay_to_company VARCHAR(100),
+    pay_to_address TEXT,
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    tax_rate DECIMAL(5,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(10,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'DRAFT',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (equipment_id) REFERENCES Equipment(equipment_id)
+);
+
+-- Invoice Line Items table
+CREATE TABLE IF NOT EXISTS Invoice_Line_Items (
+    line_item_id SERIAL PRIMARY KEY,
+    invoice_id INTEGER NOT NULL,
+    description VARCHAR(200) NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    line_total DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (invoice_id) REFERENCES Invoices(invoice_id) ON DELETE CASCADE
+);
+Backend Implementation
+Database Methods (add to database_postgres.py):
+def generate_invoice_number(self) -> str:
+    """Generate next invoice number in format INV-YYYY-001"""
+    conn = self.connect()
+    try:
+        cursor = conn.cursor()
+        year = datetime.now().year
+        cursor.execute("""
+            SELECT MAX(CAST(SUBSTRING(invoice_number FROM 'INV-%s-(.*)') AS INTEGER))
+            FROM Invoices WHERE invoice_number LIKE %s
+        """, (year, f'INV-{year}-%'))
+        
+        result = cursor.fetchone()
+        next_num = (result[0] or 0) + 1
+        return f"INV-{year}-{next_num:03d}"
+    finally:
+        conn.close()
+
+def create_invoice(self, equipment_id: str, job_number: str, issued_to_data: dict, pay_to_data: dict) -> int:
+    """Create new invoice and return invoice_id"""
+    
+def add_invoice_line_item(self, invoice_id: int, description: str, unit_price: float, quantity: int) -> int:
+    """Add line item to invoice"""
+    
+def update_invoice_totals(self, invoice_id: int, tax_rate: float = 0) -> bool:
+    """Recalculate and update invoice totals"""
+    
+def get_invoice_by_id(self, invoice_id: int) -> Optional[Dict]:
+    """Get complete invoice with line items"""
+    
+def get_invoices_list(self, status_filter: str = None) -> List[Dict]:
+    """Get list of all invoices with basic info"""
+Frontend Implementation
+New Route (app.py):
+@app.route('/invoice/create/<equipment_id>')
+@auth.require_auth
+def create_invoice(equipment_id):
+    """Create new invoice form"""
+
+@app.route('/invoice/save', methods=['POST'])
+@auth.require_auth  
+def save_invoice():
+    """Save invoice with line items"""
+
+@app.route('/invoice/<int:invoice_id>')
+@auth.require_auth
+def view_invoice(invoice_id):
+    """View/print invoice"""
+
+@app.route('/invoices')
+@auth.require_auth
+def invoices_list():
+    """List all invoices"""
+New Templates:
+1. templates/create_invoice.html - Invoice creation form with:
+    • Auto-filled job number and date 
+    • Issued To section (auto-filled from equipment/client data) 
+    • Pay To section (manual entry with save option) 
+    • Dynamic line items table with Add/Remove buttons 
+    • Real-time total calculations 
+    • Save as Draft / Finalize buttons 
+2. templates/view_invoice.html - Clean invoice display matching your design:
+    • Professional layout with proper typography 
+    • Print-friendly CSS styles 
+    • Equipment context if applicable 
+    • Status indicators (Draft/Finalized/Paid) 
+3. templates/invoices_list.html - Invoice management dashboard:
+    • Sortable table of all invoices 
+    • Status filters (Draft/Sent/Paid/Overdue) 
+    • Quick actions (View/Edit/Print/Delete) 
+    • Summary statistics 
+JavaScript Features:
+    • Dynamic line item addition/removal 
+    • Real-time calculation of line totals and invoice total 
+    • Form validation before submission 
+    • Print functionality 
+    • Auto-save draft capability 
+UI Integration Points:
+    1. Equipment Details Page: Add "Generate Invoice" button that links to /invoice/create/<equipment_id> 
+    2. Main Navigation: Add "Invoices" menu item 
+    3. Reports Dashboard: Add invoice summary statistics 
+Additional Features:
+    • Invoice number auto-generation (INV-YYYY-001 format) 
+    • PDF export capability using browser print 
+    • Invoice status management (Draft → Sent → Paid) 
+    • Tax calculation with configurable rates 
+    • Client information auto-fill from equipment records 
+    • Invoice templates with company branding options 
+Make the invoice design clean and professional, matching the minimalist style shown in the reference image. Ensure all calculations are accurate and the interface is intuitive for quick service billing entry.

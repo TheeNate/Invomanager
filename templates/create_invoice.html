@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Create Invoice{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-receipt"></i> Create Invoice</h2>
+                <a href="{{ url_for('invoices_list') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Invoices
+                </a>
+            </div>
+
+            <form method="POST" action="{{ url_for('save_invoice') }}" id="invoiceForm">
+                <div class="row">
+                    <!-- Left Column - Invoice Details -->
+                    <div class="col-md-8">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Invoice Details</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="equipment_id" class="form-label">Equipment ID</label>
+                                            <input type="text" class="form-control" id="equipment_id" name="equipment_id" 
+                                                   value="{{ equipment.equipment_id }}" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="job_number" class="form-label">Job Number</label>
+                                            <input type="text" class="form-control" id="job_number" name="job_number" 
+                                                   value="{{ job.job_id if job else '' }}" 
+                                                   placeholder="Enter job number">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="invoice_date" class="form-label">Invoice Date <span class="text-danger">*</span></label>
+                                            <input type="date" class="form-control" id="invoice_date" name="invoice_date" 
+                                                   value="{{ today }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
+                                            <input type="date" class="form-control" id="due_date" name="due_date" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Issued To Section -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-person"></i> Issued To</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="issued_to_name" class="form-label">Contact Name</label>
+                                            <input type="text" class="form-control" id="issued_to_name" name="issued_to_name" 
+                                                   value="{{ job.customer_name if job else '' }}" 
+                                                   placeholder="Enter contact name">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="issued_to_company" class="form-label">Company</label>
+                                            <input type="text" class="form-control" id="issued_to_company" name="issued_to_company" 
+                                                   placeholder="Enter company name">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="issued_to_address" class="form-label">Address</label>
+                                    <textarea class="form-control" id="issued_to_address" name="issued_to_address" 
+                                              rows="3" placeholder="Enter billing address"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pay To Section -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-building"></i> Pay To</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="pay_to_name" class="form-label">Contact Name</label>
+                                            <input type="text" class="form-control" id="pay_to_name" name="pay_to_name" 
+                                                   placeholder="Enter your contact name">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="pay_to_company" class="form-label">Company</label>
+                                            <input type="text" class="form-control" id="pay_to_company" name="pay_to_company" 
+                                                   placeholder="Enter your company name">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="pay_to_address" class="form-label">Address</label>
+                                    <textarea class="form-control" id="pay_to_address" name="pay_to_address" 
+                                              rows="3" placeholder="Enter your business address"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Line Items Section -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Line Items</h5>
+                                <button type="button" class="btn btn-sm btn-success" onclick="addLineItem()">
+                                    <i class="bi bi-plus"></i> Add Item
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="lineItemsTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 50%;">Description</th>
+                                                <th style="width: 20%;">Unit Price</th>
+                                                <th style="width: 15%;">Quantity</th>
+                                                <th style="width: 20%;">Total</th>
+                                                <th style="width: 5%;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="lineItemsBody">
+                                            <!-- Line items will be added here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Totals and Actions -->
+                    <div class="col-md-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-calculator"></i> Invoice Totals</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-6 fw-bold">Subtotal:</div>
+                                    <div class="col-6 text-end" id="subtotalDisplay">$0.00</div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-8">
+                                        <label for="tax_rate" class="form-label">Tax Rate (%):</label>
+                                        <input type="number" class="form-control form-control-sm" id="tax_rate" 
+                                               name="tax_rate" value="0" min="0" max="100" step="0.01" 
+                                               onchange="calculateTotals()">
+                                    </div>
+                                    <div class="col-4 text-end" id="taxDisplay">$0.00</div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-6 fw-bold fs-5">Total:</div>
+                                    <div class="col-6 text-end fw-bold fs-5" id="totalDisplay">$0.00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-gear"></i> Actions</h5>
+                            </div>
+                            <div class="card-body d-grid gap-2">
+                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+                                    <i class="bi bi-file-earmark"></i> Save as Draft
+                                </button>
+                                <button type="submit" name="action" value="finalize" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> Create & Send Invoice
+                                </button>
+                                <a href="{{ url_for('invoices_list') }}" class="btn btn-secondary">
+                                    <i class="bi bi-x-circle"></i> Cancel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let lineItemCounter = 0;
+
+function addLineItem() {
+    lineItemCounter++;
+    const tbody = document.getElementById('lineItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>
+            <input type="text" class="form-control" name="line_description[]" 
+                   placeholder="Enter description" required>
+        </td>
+        <td>
+            <input type="number" class="form-control" name="line_price[]" 
+                   step="0.01" min="0" placeholder="0.00" onchange="calculateLineTotal(this)" required>
+        </td>
+        <td>
+            <input type="number" class="form-control" name="line_quantity[]" 
+                   min="1" value="1" onchange="calculateLineTotal(this)" required>
+        </td>
+        <td class="text-end line-total">$0.00</td>
+        <td>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLineItem(this)">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(row);
+}
+
+function removeLineItem(button) {
+    button.closest('tr').remove();
+    calculateTotals();
+}
+
+function calculateLineTotal(input) {
+    const row = input.closest('tr');
+    const price = parseFloat(row.querySelector('input[name="line_price[]"]').value) || 0;
+    const quantity = parseInt(row.querySelector('input[name="line_quantity[]"]').value) || 0;
+    const total = price * quantity;
+    
+    row.querySelector('.line-total').textContent = '$' + total.toFixed(2);
+    calculateTotals();
+}
+
+function calculateTotals() {
+    const lineTotals = document.querySelectorAll('.line-total');
+    let subtotal = 0;
+    
+    lineTotals.forEach(totalCell => {
+        const amount = parseFloat(totalCell.textContent.replace('$', '')) || 0;
+        subtotal += amount;
+    });
+    
+    const taxRate = parseFloat(document.getElementById('tax_rate').value) || 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    
+    document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
+    document.getElementById('taxDisplay').textContent = '$' + taxAmount.toFixed(2);
+    document.getElementById('totalDisplay').textContent = '$' + total.toFixed(2);
+}
+
+// Set default due date to 30 days from invoice date
+document.getElementById('invoice_date').addEventListener('change', function() {
+    const invoiceDate = new Date(this.value);
+    const dueDate = new Date(invoiceDate);
+    dueDate.setDate(dueDate.getDate() + 30);
+    
+    document.getElementById('due_date').value = dueDate.toISOString().split('T')[0];
+});
+
+// Add initial line item
+document.addEventListener('DOMContentLoaded', function() {
+    addLineItem();
+});
+</script>
+{% endblock %}
