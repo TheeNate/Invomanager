@@ -1094,7 +1094,6 @@ def save_invoice():
         equipment_id = request.form.get('equipment_id')
         job_number = request.form.get('job_number')
         invoice_date = request.form.get('invoice_date')
-        due_date = request.form.get('due_date')
         tax_rate = float(request.form.get('tax_rate', 0))
         
         # Issued to data
@@ -1114,7 +1113,7 @@ def save_invoice():
         # Create invoice
         invoice_id = db_manager.create_invoice(
             equipment_id, job_number, issued_to_data, pay_to_data, 
-            invoice_date, due_date
+            invoice_date
         )
         
         # Add line items

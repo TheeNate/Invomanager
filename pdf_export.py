@@ -377,7 +377,6 @@ def generate_invoice_pdf(invoice: Dict) -> io.BytesIO:
     header_data = [
         ["Invoice Number:", invoice.get('invoice_number', 'N/A')],
         ["Invoice Date:", invoice.get('invoice_date', date.today()).strftime('%B %d, %Y') if invoice.get('invoice_date') else 'N/A'],
-        ["Due Date:", invoice.get('due_date', '').strftime('%B %d, %Y') if invoice.get('due_date') else 'N/A'],
         ["Status:", invoice.get('status', 'DRAFT')]
     ]
     

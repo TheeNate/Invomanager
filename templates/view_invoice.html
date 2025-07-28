@@ -71,7 +71,6 @@
                                 </span>
                             </div>
                             <p class="mb-1"><strong>Invoice Date:</strong> {{ invoice.invoice_date.strftime('%B %d, %Y') if invoice.invoice_date else 'N/A' }}</p>
-                            <p class="mb-1"><strong>Due Date:</strong> {{ invoice.due_date.strftime('%B %d, %Y') if invoice.due_date else 'N/A' }}</p>
                             {% if invoice.job_number %}
                             <p class="mb-0"><strong>Job Number:</strong> {{ invoice.job_number }}</p>
                             {% endif %}

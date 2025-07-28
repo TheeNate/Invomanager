@@ -1093,9 +1093,9 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def create_invoice(self, equipment_id: str, job_number: str, issued_to_data: dict, pay_to_data: dict, invoice_date: str = None, due_date: str = None) -> int:
+    def create_invoice(self, equipment_id: str, job_number: str, issued_to_data: dict, pay_to_data: dict, invoice_date: str = None) -> int:
         """Create new invoice and return invoice_id"""
-        from datetime import datetime, timedelta
+        from datetime import datetime
         
         conn = self.connect()
         try:
@@ -1104,21 +1104,19 @@ class DatabaseManager:
             # Generate invoice number
             invoice_number = self.generate_invoice_number()
             
-            # Set dates if not provided
+            # Set date if not provided
             if not invoice_date:
                 invoice_date = datetime.now().date()
-            if not due_date:
-                due_date = datetime.now().date() + timedelta(days=30)
             
             cursor.execute("""
                 INSERT INTO Invoices (
-                    invoice_number, equipment_id, job_number, invoice_date, due_date,
+                    invoice_number, equipment_id, job_number, invoice_date,
                     issued_to_name, issued_to_company, issued_to_address,
                     pay_to_name, pay_to_company, pay_to_address
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING invoice_id
             """, (
-                invoice_number, equipment_id, job_number, invoice_date, due_date,
+                invoice_number, equipment_id, job_number, invoice_date,
                 issued_to_data.get('name'), issued_to_data.get('company'), issued_to_data.get('address'),
                 pay_to_data.get('name'), pay_to_data.get('company'), pay_to_data.get('address')
             ))
