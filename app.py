@@ -1060,7 +1060,7 @@ def api_active_jobs():
 
 # Invoice Management Routes
 
-@app.route('/invoice/create/<equipment_id>')
+@app.route('/invoice/create/<path:equipment_id>')
 @auth.require_auth
 def create_invoice(equipment_id):
     """Create new invoice form"""

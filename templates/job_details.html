@@ -358,8 +358,8 @@ function generateInvoice() {
     // Use the first equipment item for invoice creation
     const firstEquipmentId = equipmentRows[0].getAttribute('data-equipment-id');
     
-    // Redirect to invoice creation page using URL encoding
-    window.location.href = `/invoice/create/${encodeURIComponent(firstEquipmentId)}`;
+    // Redirect to invoice creation page
+    window.location.href = `/invoice/create/${firstEquipmentId}`;
 }
 </script>
 {% endblock %}
