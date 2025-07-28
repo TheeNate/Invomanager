@@ -16,6 +16,9 @@
                     <button type="button" class="btn btn-primary" onclick="window.print()">
                         <i class="bi bi-printer"></i> Print
                     </button>
+                    <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.invoice_id) }}" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download PDF
+                    </a>
                     {% if invoice.status == 'DRAFT' %}
                     <div class="btn-group">
                         <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">

@@ -1128,8 +1128,8 @@ def save_invoice():
                 quantity = int(line_quantities[i])
                 db_manager.add_invoice_line_item(invoice_id, description, unit_price, quantity)
         
-        # Update totals with tax
-        db_manager.update_invoice_totals(invoice_id, tax_rate)
+        # Update totals with tax (convert float to prevent decimal/float errors)
+        db_manager.update_invoice_totals(invoice_id, float(tax_rate))
         
         # Update status if specified
         if request.form.get('action') == 'finalize':
@@ -1157,6 +1157,31 @@ def view_invoice(invoice_id):
     except Exception as e:
         flash(f'Error loading invoice: {str(e)}', 'error')
         return redirect(url_for('invoices_list'))
+
+@app.route('/invoice/<int:invoice_id>/pdf')
+@auth.require_auth
+def download_invoice_pdf(invoice_id):
+    """Download invoice as PDF"""
+    try:
+        invoice = db_manager.get_invoice_by_id(invoice_id)
+        if not invoice:
+            flash('Invoice not found', 'error')
+            return redirect(url_for('invoices_list'))
+        
+        from pdf_export import generate_invoice_pdf
+        pdf_buffer = generate_invoice_pdf(invoice)
+        
+        filename = f"Invoice_{invoice['invoice_number']}.pdf"
+        
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/invoices')
 @auth.require_auth

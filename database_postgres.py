@@ -1172,8 +1172,11 @@ class DatabaseManager:
             """, (invoice_id,))
             subtotal = cursor.fetchone()[0]
             
-            # Calculate tax and total
-            tax_amount = subtotal * (tax_rate / 100)
+            # Convert to Decimal and calculate tax and total
+            from decimal import Decimal
+            subtotal = Decimal(str(subtotal))
+            tax_rate_decimal = Decimal(str(tax_rate))
+            tax_amount = subtotal * (tax_rate_decimal / Decimal('100'))
             total_amount = subtotal + tax_amount
             
             # Update invoice
