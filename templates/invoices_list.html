@@ -93,15 +93,7 @@
                                         </td>
                                         <td>
                                             {% if invoice.due_date %}
-                                                {% set days_until_due = (invoice.due_date - today).days if today else 0 %}
-                                                <span class="{% if invoice.status == 'SENT' and days_until_due < 0 %}text-danger{% elif invoice.status == 'SENT' and days_until_due <= 7 %}text-warning{% endif %}">
-                                                    {{ invoice.due_date.strftime('%m/%d/%Y') }}
-                                                    {% if invoice.status == 'SENT' and days_until_due < 0 %}
-                                                        <small>({{ -days_until_due }} days overdue)</small>
-                                                    {% elif invoice.status == 'SENT' and days_until_due <= 7 %}
-                                                        <small>(due in {{ days_until_due }} days)</small>
-                                                    {% endif %}
-                                                </span>
+                                                <span>{{ invoice.due_date.strftime('%m/%d/%Y') }}</span>
                                             {% else %}
                                                 N/A
                                             {% endif %}
@@ -200,6 +192,6 @@
 
 <script>
 // Set today's date for due date calculations
-const today = new Date('{{ "now"|date }}');
+const today = new Date();
 </script>
 {% endblock %}

@@ -1168,11 +1168,15 @@ def invoices_list():
         
         return render_template('invoices_list.html', 
                              invoices=invoices,
-                             current_filter=status_filter)
+                             current_filter=status_filter,
+                             today=date.today())
         
     except Exception as e:
         flash(f'Error loading invoices: {str(e)}', 'error')
-        return render_template('invoices_list.html', invoices=[])
+        return render_template('invoices_list.html', 
+                             invoices=[], 
+                             current_filter=None,
+                             today=date.today())
 
 @app.route('/invoice/<int:invoice_id>/status', methods=['POST'])
 @auth.require_auth
