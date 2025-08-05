@@ -22,6 +22,16 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# Configure app for external URL generation
+# Set the preferred URL scheme for external URLs
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Set server name from environment or use the Replit domain
+replit_domains = os.environ.get('REPLIT_DOMAINS', '')
+if replit_domains:
+    # Use the first domain from REPLIT_DOMAINS
+    app.config['SERVER_NAME'] = replit_domains.split(',')[0]
+
 # Template filters
 @app.template_filter('strptime')
 def strptime_filter(date_string, format='%Y-%m-%d'):
