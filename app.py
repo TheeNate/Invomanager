@@ -22,6 +22,17 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# Template filters
+@app.template_filter('strptime')
+def strptime_filter(date_string, format='%Y-%m-%d'):
+    """Parse date string for templates"""
+    if not date_string:
+        return None
+    try:
+        return datetime.strptime(str(date_string), format)
+    except (ValueError, TypeError):
+        return None
+
 
 
 

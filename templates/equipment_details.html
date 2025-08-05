@@ -82,7 +82,10 @@
                             {{ equipment.date_put_in_service | date_format or '<em class="text-muted">Not yet in service</em>' | safe }}
                             {% if equipment.is_soft_goods and equipment.date_put_in_service %}
                                 <small class="text-muted d-block">
-                                    Expires: {{ (equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).replace(year=(equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')).year + (equipment.lifespan_years or 10)) | strftime('%Y-%m-%d') }}
+                                    {% set expiration_date = (equipment.date_put_in_service | date_format | strptime('%Y-%m-%d')) %}
+                                    {% if expiration_date %}
+                                        Expires: {{ expiration_date.replace(year=expiration_date.year + (equipment.lifespan_years or 10)).strftime('%Y-%m-%d') }}
+                                    {% endif %}
                                 </small>
                             {% endif %}
                         </dd>
