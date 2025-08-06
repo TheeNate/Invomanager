@@ -1167,9 +1167,15 @@ def save_invoice():
         # Update totals with tax (convert float to prevent decimal/float errors)
         db_manager.update_invoice_totals(invoice_id, float(tax_rate))
         
-        # Update status if specified
-        if request.form.get('action') == 'finalize':
-            db_manager.update_invoice_status(invoice_id, 'SENT')
+        # Get selected status (default to DRAFT if not provided)
+        invoice_status = request.form.get('invoice_status', 'DRAFT')
+
+        # Only allow DRAFT or SENT on creation
+        if invoice_status not in ['DRAFT', 'SENT']:
+            invoice_status = 'DRAFT'
+
+        # Update status after creating invoice and line items
+        db_manager.update_invoice_status(invoice_id, invoice_status)
         
         flash('Invoice created successfully', 'success')
         return redirect(url_for('view_invoice', invoice_id=invoice_id))
@@ -1271,6 +1277,108 @@ def delete_invoice_route(invoice_id):
     except Exception as e:
         flash(f'Error deleting invoice: {str(e)}', 'error')
         return redirect(url_for('invoices_list'))
+
+@app.route('/invoice/<int:invoice_id>/edit')
+@auth.require_auth
+def edit_invoice(invoice_id):
+    """Edit existing invoice"""
+    try:
+        invoice = db_manager.get_invoice_by_id(invoice_id)
+        if not invoice:
+            flash('Invoice not found', 'error')
+            return redirect(url_for('invoices_list'))
+        
+        # Only allow editing DRAFT invoices
+        if invoice['status'] != 'DRAFT':
+            flash('Only DRAFT invoices can be edited', 'warning')
+            return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        
+        return render_template('edit_invoice.html', 
+                             invoice=invoice,
+                             today=date.today().strftime('%Y-%m-%d'))
+        
+    except Exception as e:
+        flash(f'Error loading invoice for editing: {str(e)}', 'error')
+        return redirect(url_for('invoices_list'))
+
+@app.route('/invoice/<int:invoice_id>/update', methods=['POST'])
+@auth.require_auth
+def update_invoice(invoice_id):
+    """Update existing invoice"""
+    try:
+        # Get form data (similar to save_invoice)
+        equipment_id = request.form.get('equipment_id') or None
+        job_number = request.form.get('job_number') or None
+        invoice_date = request.form.get('invoice_date')
+        tax_rate = float(request.form.get('tax_rate', 0))
+        
+        # Issued to data
+        issued_to_data = {
+            'name': request.form.get('issued_to_name'),
+            'company': request.form.get('issued_to_company'),
+            'address': request.form.get('issued_to_address')
+        }
+        
+        # Pay to data
+        pay_to_data = {
+            'name': request.form.get('pay_to_name'),
+            'company': request.form.get('pay_to_company'),
+            'address': request.form.get('pay_to_address')
+        }
+        
+        # Update invoice details
+        conn = db_manager.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Invoices SET 
+                    equipment_id = %s, job_number = %s, invoice_date = %s,
+                    issued_to_name = %s, issued_to_company = %s, issued_to_address = %s,
+                    pay_to_name = %s, pay_to_company = %s, pay_to_address = %s
+                WHERE invoice_id = %s
+            """, (
+                equipment_id, job_number, invoice_date,
+                issued_to_data['name'], issued_to_data['company'], issued_to_data['address'],
+                pay_to_data['name'], pay_to_data['company'], pay_to_data['address'],
+                invoice_id
+            ))
+            
+            # Delete old line items
+            cursor.execute("DELETE FROM Invoice_Line_Items WHERE invoice_id = %s", (invoice_id,))
+            
+            # Add new line items
+            line_descriptions = request.form.getlist('line_description[]')
+            line_prices = request.form.getlist('line_price[]')
+            line_quantities = request.form.getlist('line_quantity[]')
+            
+            for i, description in enumerate(line_descriptions):
+                if description.strip():
+                    unit_price = float(line_prices[i])
+                    quantity = int(line_quantities[i])
+                    cursor.execute("""
+                        INSERT INTO Invoice_Line_Items (invoice_id, description, unit_price, quantity, line_total)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (invoice_id, description, unit_price, quantity, unit_price * quantity))
+            
+            conn.commit()
+            
+            # Update totals
+            db_manager.update_invoice_totals(invoice_id, float(tax_rate))
+            
+            # Update status if specified
+            invoice_status = request.form.get('invoice_status', 'DRAFT')
+            if invoice_status in ['DRAFT', 'SENT']:
+                db_manager.update_invoice_status(invoice_id, invoice_status)
+            
+        finally:
+            conn.close()
+        
+        flash('Invoice updated successfully', 'success')
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        
+    except Exception as e:
+        flash(f'Error updating invoice: {str(e)}', 'error')
+        return redirect(url_for('edit_invoice', invoice_id=invoice_id))
 
 @app.route('/job/<job_id>/delete', methods=['POST'])
 @auth.require_auth

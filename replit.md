@@ -154,6 +154,14 @@ Preferred communication style: Simple, everyday language.
 - **August 6, 2025**: Added Delete Job button to job details page with JavaScript confirmation and validation
 - **August 6, 2025**: Added delete buttons to jobs dashboard table (visible for non-ACTIVE jobs only)
 - **August 6, 2025**: Job deletion automatically cleans up equipment references and billing records while maintaining data integrity
+- **August 6, 2025**: Fixed default invoice status from PAID to DRAFT using database ALTER TABLE command
+- **August 6, 2025**: Added invoice status selection during creation (DRAFT or SENT options)
+- **August 6, 2025**: Implemented comprehensive invoice editing functionality for DRAFT invoices only
+- **August 6, 2025**: Created edit_invoice.html template with pre-filled data and status selection
+- **August 6, 2025**: Enhanced view_invoice.html with improved actions dropdown for all invoice statuses
+- **August 6, 2025**: Added edit buttons to invoices list for DRAFT invoices
+- **August 6, 2025**: Updated save_invoice and added update_invoice routes with proper status handling
+- **August 6, 2025**: Improved invoice workflow: DRAFT → SENT → PAID with reverse transitions allowed
 
 ### Future Scalability
 - Authentication system can be added for user management
