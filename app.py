@@ -529,38 +529,7 @@ def add_equipment_type():
         flash(f'Error adding equipment type: {str(e)}', 'error')
         return redirect(url_for('equipment_types'))
 
-@app.route('/reports')
-@auth.require_auth
-def reports():
-    """Reports dashboard"""
-    try:
-        # Get report data
-        overdue_inspections = db_manager.get_overdue_inspections()
-        red_tagged_equipment = db_manager.get_red_tagged_equipment()
-        expiring_equipment = db_manager.get_expiring_soft_goods()
 
-        # Get equipment statistics
-        all_equipment = db_manager.get_equipment_list()
-        stats = {
-            'total': len(all_equipment),
-            'active': len([eq for eq in all_equipment if eq['status'] == 'ACTIVE']),
-            'red_tagged': len([eq for eq in all_equipment if eq['status'] == 'RED_TAGGED']),
-            'destroyed': len([eq for eq in all_equipment if eq['status'] == 'DESTROYED'])
-        }
-
-        return render_template('reports.html',
-                             overdue_inspections=overdue_inspections,
-                             red_tagged_equipment=red_tagged_equipment,
-                             expiring_equipment=expiring_equipment,
-                             stats=stats)
-
-    except Exception as e:
-        flash(f'Error loading reports: {str(e)}', 'error')
-        return render_template('reports.html',
-                             overdue_inspections=[],
-                             red_tagged_equipment=[],
-                             expiring_equipment=[],
-                             stats={'total': 0, 'active': 0, 'red_tagged': 0, 'destroyed': 0})
 
 @app.route('/api/equipment/<path:equipment_id>')
 @auth.require_auth
