@@ -138,6 +138,9 @@ Preferred communication style: Simple, everyday language.
 - **July 28, 2025**: Added invoice management dashboard with status filtering and summary statistics
 - **July 28, 2025**: Added "Invoices" menu item to main navigation for easy access
 - **July 28, 2025**: Removed due date field from invoice system per user request - invoices now only track invoice date
+- **August 6, 2025**: Fixed template filter error causing H and R equipment items to show "No filter named 'strptime' found" error
+- **August 6, 2025**: Added missing Jinja2 template filters: strptime, add_years, strftime for proper date calculations in equipment details
+- **August 6, 2025**: Simplified expiration date calculation for soft goods equipment in equipment details template
 
 ### Future Scalability
 - Authentication system can be added for user management

@@ -637,6 +637,40 @@ def result_color_filter(result):
     }
     return colors.get(result, 'dark')
 
+@app.template_filter('strptime')
+def strptime_filter(date_string, format='%Y-%m-%d'):
+    """Parse date string into datetime object for template use"""
+    if not date_string:
+        return None
+    try:
+        from datetime import datetime
+        return datetime.strptime(date_string, format)
+    except:
+        return None
+
+@app.template_filter('add_years')
+def add_years_filter(date_obj, years):
+    """Add years to a date object"""
+    if not date_obj or not years:
+        return date_obj
+    try:
+        if isinstance(date_obj, str):
+            from datetime import datetime
+            date_obj = datetime.strptime(date_obj, '%Y-%m-%d')
+        return date_obj.replace(year=date_obj.year + int(years))
+    except:
+        return date_obj
+
+@app.template_filter('strftime')
+def strftime_filter(date_obj, format='%Y-%m-%d'):
+    """Format datetime object to string"""
+    if not date_obj:
+        return None
+    try:
+        return date_obj.strftime(format)
+    except:
+        return str(date_obj)
+
 @app.route('/export/pdf/complete')
 @auth.require_auth
 def export_complete_inventory_pdf():
