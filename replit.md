@@ -142,6 +142,12 @@ Preferred communication style: Simple, everyday language.
 - **August 6, 2025**: Added missing Jinja2 template filters: strptime, add_years, strftime for proper date calculations in equipment details
 - **August 6, 2025**: Simplified expiration date calculation for soft goods equipment in equipment details template
 - **August 6, 2025**: Removed reports functionality and navigation tab per user request - simplified navigation menu
+- **August 6, 2025**: Fixed critical invoice functionality issues - removed equipment requirement for invoice generation
+- **August 6, 2025**: Added new routes: /invoice/create/from_job/<job_id> and /invoice/create/new for flexible invoice creation
+- **August 6, 2025**: Removed due_date column references from database queries and templates to prevent errors
+- **August 6, 2025**: Updated invoice creation form to make equipment_id and job_number optional fields
+- **August 6, 2025**: Added "Create New Invoice" button to invoices list page for independent invoice creation
+- **August 6, 2025**: Modified generateInvoice() function to work directly from jobs without requiring equipment assignment
 
 ### Future Scalability
 - Authentication system can be added for user management

@@ -1241,7 +1241,7 @@ class DatabaseManager:
             
             query = """
                 SELECT i.invoice_id, i.invoice_number, i.job_number, i.invoice_date, 
-                       i.due_date, i.total_amount, i.status, i.issued_to_name, i.issued_to_company,
+                       i.total_amount, i.status, i.issued_to_name, i.issued_to_company,
                        j.customer_name, j.job_title
                 FROM Invoices i
                 LEFT JOIN Jobs j ON i.job_number = j.job_id

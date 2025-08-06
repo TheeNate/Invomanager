@@ -35,13 +35,18 @@
                             </div>
                         </div>
                         <div class="col-md-6 text-end">
+                            <!-- Create New Invoice Button -->
+                            <a href="{{ url_for('create_invoice_new') }}" class="btn btn-primary me-2">
+                                <i class="bi bi-plus-circle"></i> Create New Invoice
+                            </a>
+                            
                             <!-- Summary Statistics -->
                             {% set draft_count = invoices | selectattr('status', 'equalto', 'DRAFT') | list | length %}
                             {% set sent_count = invoices | selectattr('status', 'equalto', 'SENT') | list | length %}
                             {% set paid_count = invoices | selectattr('status', 'equalto', 'PAID') | list | length %}
                             {% set total_amount = invoices | sum(attribute='total_amount') %}
                             
-                            <small class="text-muted">
+                            <small class="text-muted d-block mt-1">
                                 Total: {{ invoices | length }} invoices | 
                                 {{ draft_count }} draft, {{ sent_count }} sent, {{ paid_count }} paid |
                                 Total Value: ${{ "%.2f"|format(total_amount or 0) }}
@@ -71,7 +76,6 @@
                                     <tr>
                                         <th>Invoice #</th>
                                         <th>Date</th>
-                                        <th>Due Date</th>
                                         <th>Customer</th>
                                         <th>Job</th>
                                         <th>Amount</th>
@@ -90,13 +94,6 @@
                                         </td>
                                         <td>
                                             {{ invoice.invoice_date.strftime('%m/%d/%Y') if invoice.invoice_date else 'N/A' }}
-                                        </td>
-                                        <td>
-                                            {% if invoice.due_date %}
-                                                <span>{{ invoice.due_date.strftime('%m/%d/%Y') }}</span>
-                                            {% else %}
-                                                N/A
-                                            {% endif %}
                                         </td>
                                         <td>
                                             {% if invoice.issued_to_company %}

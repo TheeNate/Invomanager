@@ -1063,6 +1063,40 @@ def api_active_jobs():
 
 # Invoice Management Routes
 
+@app.route('/invoice/create/from_job/<job_id>')
+@auth.require_auth
+def create_invoice_from_job(job_id):
+    """Create new invoice form from job"""
+    try:
+        # Get job details
+        job = db_manager.get_job_by_id(job_id)
+        if not job:
+            flash('Job not found', 'error')
+            return redirect(url_for('jobs_dashboard'))
+
+        return render_template('create_invoice.html', 
+                             equipment=None,
+                             job=job,
+                             today=date.today().strftime('%Y-%m-%d'))
+
+    except Exception as e:
+        flash(f'Error loading invoice form: {str(e)}', 'error')
+        return redirect(url_for('jobs_dashboard'))
+
+@app.route('/invoice/create/new')
+@auth.require_auth
+def create_invoice_new():
+    """Create new blank invoice form"""
+    try:
+        return render_template('create_invoice.html', 
+                             equipment=None,
+                             job=None,
+                             today=date.today().strftime('%Y-%m-%d'))
+
+    except Exception as e:
+        flash(f'Error loading invoice form: {str(e)}', 'error')
+        return redirect(url_for('invoices_list'))
+
 @app.route('/invoice/create/<path:equipment_id>')
 @auth.require_auth
 def create_invoice(equipment_id):
@@ -1094,8 +1128,8 @@ def save_invoice():
     """Save invoice with line items"""
     try:
         # Get form data
-        equipment_id = request.form.get('equipment_id')
-        job_number = request.form.get('job_number')
+        equipment_id = request.form.get('equipment_id') or None  # Make optional
+        job_number = request.form.get('job_number') or None      # Make optional
         invoice_date = request.form.get('invoice_date')
         tax_rate = float(request.form.get('tax_rate', 0))
         

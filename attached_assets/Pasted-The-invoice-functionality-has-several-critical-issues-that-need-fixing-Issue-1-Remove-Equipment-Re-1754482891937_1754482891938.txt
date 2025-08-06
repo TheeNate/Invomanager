@@ -1,0 +1,63 @@
+The invoice functionality has several critical issues that need fixing:
+Issue 1: Remove Equipment Requirement for Invoice Generation
+In templates/job_details.html, the generateInvoice() JavaScript function requires equipment to be assigned to the job. This should not be a requirement. Please modify the function to:
+
+Remove the check for equipment assignment
+Change the route to create invoices directly from jobs without requiring equipment
+Update the function to redirect to /invoice/create/from_job/<job_id> instead
+
+Issue 2: Fix Database Column Error - Remove due_date References
+The invoice list page shows an error because due_date column doesn't exist (it was removed per previous requirements). Please fix:
+
+In database_postgres.py, in the get_invoices_list() method, remove i.due_date from the SELECT statement
+Remove any other references to due_date in invoice-related queries
+Check templates/invoices_list.html and remove the "Due Date" column from the table if it exists
+Update any other templates that might reference invoice.due_date
+
+Issue 3: Add New Routes for Creating Invoices
+Create these new routes in app.py:
+
+Route: /invoice/create/from_job/<job_id>
+
+Create invoice directly from a job (no equipment required)
+Pre-fill customer info from the job
+Allow invoice creation without equipment context
+
+
+Route: /invoice/create/new
+
+Create a blank invoice from the Invoices page
+No pre-filled data
+Completely independent of jobs or equipment
+
+
+
+Issue 4: Update Invoice Creation Form
+Modify templates/create_invoice.html to:
+
+Make equipment_id optional (not required)
+Handle cases where there's no equipment or job context
+Allow manual entry of all fields when creating from scratch
+
+Issue 5: Add Create Invoice Button to Invoices Page
+In templates/invoices_list.html:
+
+Add a "Create New Invoice" button in the header section
+Link it to the new /invoice/create/new route
+Place it next to or near the filter controls
+
+Issue 6: Update Database Schema (if needed)
+In database_postgres.py, ensure the Invoices table creation:
+
+Does NOT include a due_date column
+Makes equipment_id and job_number both OPTIONAL (nullable)
+Already allows invoices to exist independently
+
+Expected Results After Fix:
+
+Invoices can be created from Jobs page WITHOUT equipment assigned
+Invoices can be created directly from the Invoices page
+The invoices list loads without database errors
+Invoice creation is flexible and not tied to equipment
+
+Please make these changes to enable proper invoice functionality that works independently of equipment assignments.
