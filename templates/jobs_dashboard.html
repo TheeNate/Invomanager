@@ -227,6 +227,15 @@
                                         <a href="{{ url_for('edit_job', job_id=job.job_id) }}" class="btn btn-outline-secondary">
                                             <i class="bi bi-pencil"></i> Edit
                                         </a>
+                                        {% if job.status not in ['ACTIVE'] %}
+                                        <form method="POST" action="{{ url_for('delete_job', job_id=job.job_id) }}" 
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Delete job {{ job.job_id }}? This cannot be undone.');">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete Job">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>

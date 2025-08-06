@@ -242,6 +242,11 @@
                         </a>
                         {% endif %}
                         
+                        <!-- Add Delete Button -->
+                        <button type="button" class="btn btn-danger" onclick="confirmDeleteJob()">
+                            <i class="bi bi-trash"></i> Delete Job
+                        </button>
+                        
                         {% if job.status == 'ACTIVE' and job_equipment %}
                         <button type="button" class="btn btn-outline-success" onclick="markJobComplete()">
                             <i class="bi bi-check-circle"></i> Mark Complete
@@ -350,6 +355,33 @@ function generateInvoice() {
     // Redirect to invoice creation page directly from job
     const jobId = '{{ job.job_id }}';
     window.location.href = `/invoice/create/from_job/${jobId}`;
+}
+
+function confirmDeleteJob() {
+    // Check job status first
+    const jobStatus = '{{ job.status }}';
+    
+    if (jobStatus === 'ACTIVE') {
+        alert('Cannot delete an ACTIVE job. Please change the status to COMPLETED or CANCELLED first.');
+        return;
+    }
+    
+    // Check for assigned equipment
+    const equipmentRows = document.querySelectorAll('tr[data-equipment-id]');
+    if (equipmentRows.length > 0) {
+        alert('Cannot delete this job. Please return all assigned equipment first.');
+        return;
+    }
+    
+    // Final confirmation
+    if (confirm('Are you sure you want to permanently delete this job?\n\nJob: {{ job.job_id }} - {{ job.customer_name }}\n\nThis action cannot be undone.')) {
+        // Create and submit form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("delete_job", job_id=job.job_id) }}';
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 </script>
 {% endblock %}

@@ -1306,3 +1306,63 @@ class DatabaseManager:
             raise Exception(f"Error deleting invoice: {str(e)}")
         finally:
             conn.close()
+
+    def delete_job(self, job_id: str) -> tuple[bool, str]:
+        """
+        Delete a job and handle all related data
+        Returns (success: bool, message: str)
+        """
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Check if equipment is still assigned to this job
+            cursor.execute("""
+                SELECT COUNT(*) FROM Equipment 
+                WHERE job_id = %s AND status = 'IN_FIELD'
+            """, (job_id,))
+            
+            equipment_count = cursor.fetchone()[0]
+            if equipment_count > 0:
+                return False, f"Cannot delete job. {equipment_count} equipment items are still assigned to this job. Please return all equipment first."
+            
+            # 2. Check for related invoices
+            cursor.execute("""
+                SELECT COUNT(*) FROM Invoices 
+                WHERE job_number = %s
+            """, (job_id,))
+            
+            invoice_count = cursor.fetchone()[0]
+            if invoice_count > 0:
+                return False, f"Cannot delete job. This job has {invoice_count} related invoice(s). Please delete the invoices first."
+            
+            # 3. Clear any equipment references (for WAREHOUSE/ACTIVE equipment that was previously assigned)
+            cursor.execute("""
+                UPDATE Equipment 
+                SET job_id = NULL 
+                WHERE job_id = %s
+            """, (job_id,))
+            
+            # 4. Delete billing record
+            cursor.execute("""
+                DELETE FROM Job_Billing 
+                WHERE job_id = %s
+            """, (job_id,))
+            
+            # 5. Finally delete the job
+            cursor.execute("""
+                DELETE FROM Jobs 
+                WHERE job_id = %s
+            """, (job_id,))
+            
+            if cursor.rowcount == 0:
+                return False, "Job not found"
+            
+            conn.commit()
+            return True, "Job deleted successfully"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error deleting job: {str(e)}"
+        finally:
+            conn.close()

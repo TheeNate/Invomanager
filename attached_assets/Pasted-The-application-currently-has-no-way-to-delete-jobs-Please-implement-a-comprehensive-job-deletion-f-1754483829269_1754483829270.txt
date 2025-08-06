@@ -1,0 +1,142 @@
+The application currently has no way to delete jobs. Please implement a comprehensive job deletion feature with proper database handling.
+Step 1: Add Delete Method to database_postgres.py
+Create a new method delete_job() that handles the complex deletion process:
+pythondef delete_job(self, job_id: str) -> tuple[bool, str]:
+    """
+    Delete a job and handle all related data
+    Returns (success: bool, message: str)
+    """
+    conn = self.connect()
+    try:
+        cursor = conn.cursor()
+        
+        # 1. Check if equipment is still assigned to this job
+        cursor.execute("""
+            SELECT COUNT(*) FROM Equipment 
+            WHERE job_id = %s AND status = 'IN_FIELD'
+        """, (job_id,))
+        
+        equipment_count = cursor.fetchone()[0]
+        if equipment_count > 0:
+            return False, f"Cannot delete job. {equipment_count} equipment items are still assigned to this job. Please return all equipment first."
+        
+        # 2. Check for related invoices
+        cursor.execute("""
+            SELECT COUNT(*) FROM Invoices 
+            WHERE job_number = %s
+        """, (job_id,))
+        
+        invoice_count = cursor.fetchone()[0]
+        if invoice_count > 0:
+            return False, f"Cannot delete job. This job has {invoice_count} related invoice(s). Please delete the invoices first."
+        
+        # 3. Clear any equipment references (for WAREHOUSE/ACTIVE equipment that was previously assigned)
+        cursor.execute("""
+            UPDATE Equipment 
+            SET job_id = NULL 
+            WHERE job_id = %s
+        """, (job_id,))
+        
+        # 4. Delete billing record
+        cursor.execute("""
+            DELETE FROM Job_Billing 
+            WHERE job_id = %s
+        """, (job_id,))
+        
+        # 5. Finally delete the job
+        cursor.execute("""
+            DELETE FROM Jobs 
+            WHERE job_id = %s
+        """, (job_id,))
+        
+        if cursor.rowcount == 0:
+            return False, "Job not found"
+        
+        conn.commit()
+        return True, "Job deleted successfully"
+        
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error deleting job: {str(e)}"
+    finally:
+        conn.close()
+Step 2: Add Route in app.py
+Add a new route to handle job deletion:
+python@app.route('/job/<job_id>/delete', methods=['POST'])
+@auth.require_auth
+def delete_job(job_id):
+    """Delete a job after validation checks"""
+    try:
+        # Call the delete method
+        success, message = db_manager.delete_job(job_id)
+        
+        if success:
+            flash(message, 'success')
+            return redirect(url_for('jobs_dashboard'))
+        else:
+            flash(message, 'error')
+            return redirect(url_for('job_details', job_id=job_id))
+            
+    except Exception as e:
+        flash(f'Error deleting job: {str(e)}', 'error')
+        return redirect(url_for('job_details', job_id=job_id))
+Step 3: Add Delete Button to Job Details Page
+In templates/job_details.html, add a delete button in the actions section (near the Edit Job button):
+html<!-- Add this after the Edit Job button -->
+<button type="button" class="btn btn-danger" onclick="confirmDeleteJob()">
+    <i class="bi bi-trash"></i> Delete Job
+</button>
+And add this JavaScript function at the bottom of the template:
+javascriptfunction confirmDeleteJob() {
+    // Check job status first
+    const jobStatus = '{{ job.status }}';
+    
+    if (jobStatus === 'ACTIVE') {
+        alert('Cannot delete an ACTIVE job. Please change the status to COMPLETED or CANCELLED first.');
+        return;
+    }
+    
+    // Check for assigned equipment
+    const equipmentRows = document.querySelectorAll('tr[data-equipment-id]');
+    if (equipmentRows.length > 0) {
+        alert('Cannot delete this job. Please return all assigned equipment first.');
+        return;
+    }
+    
+    // Final confirmation
+    if (confirm('Are you sure you want to permanently delete this job?\n\nJob: {{ job.job_id }} - {{ job.customer_name }}\n\nThis action cannot be undone.')) {
+        // Create and submit form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("delete_job", job_id=job.job_id) }}';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+Step 4: Add Delete Option to Jobs Dashboard (Optional)
+In templates/jobs_dashboard.html, add a delete button to the actions column for jobs that can be deleted:
+html<!-- In the actions column, add this after the Edit button -->
+{% if job.status not in ['ACTIVE'] %}
+<form method="POST" action="{{ url_for('delete_job', job_id=job.job_id) }}" 
+      style="display: inline;"
+      onsubmit="return confirm('Delete job {{ job.job_id }}? This cannot be undone.');">
+    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Job">
+        <i class="bi bi-trash"></i>
+    </button>
+</form>
+{% endif %}
+Business Rules for Job Deletion:
+
+Cannot delete if equipment is assigned (status = IN_FIELD)
+Cannot delete if invoices exist for the job
+Should warn if job is ACTIVE (recommend changing status first)
+Clears job_id references from any equipment that was previously assigned
+Deletes billing record automatically
+Requires confirmation before deletion
+
+Expected Results:
+
+Jobs can be deleted from the job details page
+Proper validation prevents deletion of jobs with active dependencies
+Clear error messages guide users on what needs to be done before deletion
+Database integrity is maintained through proper cleanup of related records

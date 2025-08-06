@@ -1272,6 +1272,25 @@ def delete_invoice_route(invoice_id):
         flash(f'Error deleting invoice: {str(e)}', 'error')
         return redirect(url_for('invoices_list'))
 
+@app.route('/job/<job_id>/delete', methods=['POST'])
+@auth.require_auth
+def delete_job(job_id):
+    """Delete a job after validation checks"""
+    try:
+        # Call the delete method
+        success, message = db_manager.delete_job(job_id)
+        
+        if success:
+            flash(message, 'success')
+            return redirect(url_for('jobs_dashboard'))
+        else:
+            flash(message, 'error')
+            return redirect(url_for('job_details', job_id=job_id))
+            
+    except Exception as e:
+        flash(f'Error deleting job: {str(e)}', 'error')
+        return redirect(url_for('job_details', job_id=job_id))
+
 if __name__ == '__main__':
     # Use production mode for deployment
     debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
