@@ -25,13 +25,20 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
+                                            <label for="equipment_id" class="form-label">Equipment ID</label>
+                                            <input type="text" class="form-control" id="equipment_id" name="equipment_id" 
+                                                   value="{{ equipment.equipment_id }}" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
                                             <label for="job_number" class="form-label">Job Number</label>
                                             <input type="text" class="form-control" id="job_number" name="job_number" 
                                                    value="{{ job.job_id if job else '' }}" 
                                                    placeholder="Enter job number">
                                         </div>
                                     </div>
-                                </div></div>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">

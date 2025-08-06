@@ -1110,33 +1110,13 @@ def create_invoice(equipment_id):
         flash(f'Error loading invoice form: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/invoice/create/job/<job_id>')
-@auth.require_auth
-def create_invoice_for_job(job_id):
-    """Create new invoice form for a job"""
-    try:
-        # Get job details
-        job = db_manager.get_job_by_id(job_id)
-        if not job:
-            flash('Job not found', 'error')
-            return redirect(url_for('jobs_dashboard'))
-
-        return render_template('create_invoice.html', 
-                             equipment=None,
-                             job=job,
-                             today=date.today().strftime('%Y-%m-%d'))
-
-    except Exception as e:
-        flash(f'Error loading invoice form: {str(e)}', 'error')
-        return redirect(url_for('jobs_dashboard'))
-
 @app.route('/invoice/save', methods=['POST'])
 @auth.require_auth
 def save_invoice():
     """Save invoice with line items"""
     try:
         # Get form data
-        equipment_id = request.form.get('equipment_id') or None
+        equipment_id = request.form.get('equipment_id')
         job_number = request.form.get('job_number')
         invoice_date = request.form.get('invoice_date')
         tax_rate = float(request.form.get('tax_rate', 0))

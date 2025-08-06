@@ -132,22 +132,6 @@
                             </div>
                         </div>
                     </div>
-                    {% elif invoice.job_number %}
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <h6 class="alert-heading mb-2">
-                                    <i class="bi bi-briefcase"></i> Job Context
-                                </h6>
-                                <p class="mb-0">
-                                    <strong>Job Number:</strong> {{ invoice.job_number }}
-                                    {% if invoice.customer_name and invoice.job_title %}
-                                    <br><strong>Job:</strong> {{ invoice.customer_name }} - {{ invoice.job_title }}
-                                    {% endif %}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                     {% endif %}
 
                     <!-- Line Items -->
