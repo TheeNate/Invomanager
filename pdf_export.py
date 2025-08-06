@@ -397,25 +397,21 @@ def generate_invoice_pdf(invoice: Dict) -> io.BytesIO:
     billing_data = []
     
     # Bill To and Pay To side by side
-    bill_to_text = "Bill To:<br/>"
+    bill_to_text = "Bill To:\n"
     if invoice.get('issued_to_name'):
-        bill_to_text += f"{invoice['issued_to_name']}<br/>"
+        bill_to_text += f"{invoice['issued_to_name']}\n"
     if invoice.get('issued_to_company'):
-        bill_to_text += f"{invoice['issued_to_company']}<br/>"
+        bill_to_text += f"{invoice['issued_to_company']}\n"
     if invoice.get('issued_to_address'):
-        # Replace \n with <br/> for proper line breaks in PDF
-        address = invoice['issued_to_address'].replace('\n', '<br/>')
-        bill_to_text += f"{address}<br/>"
+        bill_to_text += f"{invoice['issued_to_address']}\n"
     
-    pay_to_text = "Pay To:<br/>"
+    pay_to_text = "Pay To:\n"
     if invoice.get('pay_to_name'):
-        pay_to_text += f"{invoice['pay_to_name']}<br/>"
+        pay_to_text += f"{invoice['pay_to_name']}\n"
     if invoice.get('pay_to_company'):
-        pay_to_text += f"{invoice['pay_to_company']}<br/>"
+        pay_to_text += f"{invoice['pay_to_company']}\n"
     if invoice.get('pay_to_address'):
-        # Replace \n with <br/> for proper line breaks in PDF
-        address = invoice['pay_to_address'].replace('\n', '<br/>')
-        pay_to_text += f"{address}<br/>"
+        pay_to_text += f"{invoice['pay_to_address']}\n"
     
     billing_table = Table([[Paragraph(bill_to_text, styles['Normal']), 
                            Paragraph(pay_to_text, styles['Normal'])]], 
