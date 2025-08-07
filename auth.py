@@ -224,15 +224,23 @@ Equipment Inventory System
                     )
                     conn.commit()
                     
-                    # Create or update user record and set session
-                    user_id = self.db.create_or_update_user(email)
-                    user = self.db.get_user_by_email(email)
+                    # Get existing user first to preserve role
+                    existing_user = self.db.get_user_by_email(email)
+                    
+                    if existing_user:
+                        # User exists, preserve their role
+                        user_id = existing_user['id']
+                        user_role = existing_user['role']
+                    else:
+                        # New user, create with default technician role
+                        user_id = self.db.create_or_update_user(email)
+                        user_role = 'technician'
                     
                     # Set session with role information
                     session['authenticated'] = True
                     session['user_email'] = email
                     session['user_id'] = user_id
-                    session['user_role'] = user['role'] if user else 'technician'
+                    session['user_role'] = user_role
                     
                     return email
                     

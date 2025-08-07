@@ -1416,7 +1416,7 @@ class DatabaseManager:
                 INSERT INTO users (email, name, role) 
                 VALUES (%s, %s, %s)
                 ON CONFLICT (email) 
-                DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role
+                DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name)
                 RETURNING id
             """, (email, name, role))
             user_id = cursor.fetchone()[0]
