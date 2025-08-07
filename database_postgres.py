@@ -44,7 +44,6 @@ class DatabaseManager:
                     db_url = self.db_url
             else:
                 db_url = self.db_url
-
             connection = psycopg2.connect(db_url)
             connection.autocommit = False
             return connection
@@ -100,7 +99,7 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # User documents table
             print("Creating user documents table...")
             cursor.execute("""
@@ -1114,7 +1113,7 @@ class DatabaseManager:
                 SELECT MAX(CAST(SUBSTRING(invoice_number FROM 'INV-%s-(.*)') AS INTEGER))
                 FROM Invoices WHERE invoice_number LIKE %s
             """, (year, f'INV-{year}-%'))
-            
+
             result = cursor.fetchone()
             next_num = (result[0] or 0) + 1
             return f"INV-{year}-{next_num:03d}"
@@ -1124,18 +1123,18 @@ class DatabaseManager:
     def create_invoice(self, equipment_id: str, job_number: str, issued_to_data: dict, pay_to_data: dict, invoice_date: str = None) -> int:
         """Create new invoice and return invoice_id"""
         from datetime import datetime
-        
+
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # Generate invoice number
             invoice_number = self.generate_invoice_number()
-            
+
             # Set date if not provided
             if not invoice_date:
                 invoice_date = datetime.now().date()
-            
+
             cursor.execute("""
                 INSERT INTO Invoices (
                     invoice_number, equipment_id, job_number, invoice_date,
@@ -1148,11 +1147,11 @@ class DatabaseManager:
                 issued_to_data.get('name'), issued_to_data.get('company'), issued_to_data.get('address'),
                 pay_to_data.get('name'), pay_to_data.get('company'), pay_to_data.get('address')
             ))
-            
+
             invoice_id = cursor.fetchone()[0]
             conn.commit()
             return invoice_id
-            
+
         except Exception as e:
             conn.rollback()
             raise Exception(f"Error creating invoice: {str(e)}")
@@ -1165,21 +1164,21 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             line_total = unit_price * quantity
-            
+
             cursor.execute("""
                 INSERT INTO Invoice_Line_Items (invoice_id, description, unit_price, quantity, line_total)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING line_item_id
             """, (invoice_id, description, unit_price, quantity, line_total))
-            
+
             line_item_id = cursor.fetchone()[0]
             conn.commit()
-            
+
             # Update invoice totals
             self.update_invoice_totals(invoice_id)
-            
+
             return line_item_id
-            
+
         except Exception as e:
             conn.rollback()
             raise Exception(f"Error adding invoice line item: {str(e)}")
@@ -1191,30 +1190,30 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # Calculate subtotal from line items
             cursor.execute("""
                 SELECT COALESCE(SUM(line_total), 0) FROM Invoice_Line_Items WHERE invoice_id = %s
             """, (invoice_id,))
             subtotal = cursor.fetchone()[0]
-            
+
             # Convert to Decimal and calculate tax and total
             from decimal import Decimal
             subtotal = Decimal(str(subtotal))
             tax_rate_decimal = Decimal(str(tax_rate))
             tax_amount = subtotal * (tax_rate_decimal / Decimal('100'))
             total_amount = subtotal + tax_amount
-            
+
             # Update invoice
             cursor.execute("""
                 UPDATE Invoices 
                 SET subtotal = %s, tax_rate = %s, tax_amount = %s, total_amount = %s
                 WHERE invoice_id = %s
             """, (subtotal, tax_rate, tax_amount, total_amount, invoice_id))
-            
+
             conn.commit()
             return True
-            
+
         except Exception as e:
             conn.rollback()
             raise Exception(f"Error updating invoice totals: {str(e)}")
@@ -1226,7 +1225,7 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # Get invoice details
             cursor.execute("""
                 SELECT i.*, e.name as equipment_name, e.equipment_type, j.customer_name, j.job_title
@@ -1235,27 +1234,27 @@ class DatabaseManager:
                 LEFT JOIN Jobs j ON i.job_number = j.job_id
                 WHERE i.invoice_id = %s
             """, (invoice_id,))
-            
+
             invoice_row = cursor.fetchone()
             if not invoice_row:
                 return None
-                
+
             columns = [desc[0] for desc in cursor.description]
             invoice = dict(zip(columns, invoice_row))
-            
+
             # Get line items
             cursor.execute("""
                 SELECT * FROM Invoice_Line_Items WHERE invoice_id = %s ORDER BY line_item_id
             """, (invoice_id,))
-            
+
             line_items = []
             for row in cursor.fetchall():
                 line_columns = [desc[0] for desc in cursor.description]
                 line_items.append(dict(zip(line_columns, row)))
-            
+
             invoice['line_items'] = line_items
             return invoice
-            
+
         except Exception as e:
             raise Exception(f"Error getting invoice: {str(e)}")
         finally:
@@ -1266,7 +1265,7 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             query = """
                 SELECT i.invoice_id, i.invoice_number, i.job_number, i.invoice_date, 
                        i.total_amount, i.status, i.issued_to_name, i.issued_to_company,
@@ -1274,23 +1273,23 @@ class DatabaseManager:
                 FROM Invoices i
                 LEFT JOIN Jobs j ON i.job_number = j.job_id
             """
-            
+
             params = []
             if status_filter:
                 query += " WHERE i.status = %s"
                 params.append(status_filter)
-                
+
             query += " ORDER BY i.created_at DESC"
-            
+
             cursor.execute(query, params)
-            
+
             invoices = []
             for row in cursor.fetchall():
                 columns = [desc[0] for desc in cursor.description]
                 invoices.append(dict(zip(columns, row)))
-            
+
             return invoices
-            
+
         except Exception as e:
             raise Exception(f"Error getting invoices list: {str(e)}")
         finally:
@@ -1304,10 +1303,10 @@ class DatabaseManager:
             cursor.execute("""
                 UPDATE Invoices SET status = %s WHERE invoice_id = %s
             """, (status, invoice_id))
-            
+
             conn.commit()
             return cursor.rowcount > 0
-            
+
         except Exception as e:
             conn.rollback()
             raise Exception(f"Error updating invoice status: {str(e)}")
@@ -1319,16 +1318,16 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # Delete line items first (CASCADE should handle this, but being explicit)
             cursor.execute("DELETE FROM Invoice_Line_Items WHERE invoice_id = %s", (invoice_id,))
-            
+
             # Delete invoice
             cursor.execute("DELETE FROM Invoices WHERE invoice_id = %s", (invoice_id,))
-            
+
             conn.commit()
             return cursor.rowcount > 0
-            
+
         except Exception as e:
             conn.rollback()
             raise Exception(f"Error deleting invoice: {str(e)}")
@@ -1343,52 +1342,52 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # 1. Check if equipment is still assigned to this job
             cursor.execute("""
                 SELECT COUNT(*) FROM Equipment 
                 WHERE job_id = %s AND status = 'IN_FIELD'
             """, (job_id,))
-            
+
             equipment_count = cursor.fetchone()[0]
             if equipment_count > 0:
                 return False, f"Cannot delete job. {equipment_count} equipment items are still assigned to this job. Please return all equipment first."
-            
+
             # 2. Check for related invoices
             cursor.execute("""
                 SELECT COUNT(*) FROM Invoices 
                 WHERE job_number = %s
             """, (job_id,))
-            
+
             invoice_count = cursor.fetchone()[0]
             if invoice_count > 0:
                 return False, f"Cannot delete job. This job has {invoice_count} related invoice(s). Please delete the invoices first."
-            
+
             # 3. Clear any equipment references (for WAREHOUSE/ACTIVE equipment that was previously assigned)
             cursor.execute("""
                 UPDATE Equipment 
                 SET job_id = NULL 
                 WHERE job_id = %s
             """, (job_id,))
-            
+
             # 4. Delete billing record
             cursor.execute("""
                 DELETE FROM Job_Billing 
                 WHERE job_id = %s
             """, (job_id,))
-            
+
             # 5. Finally delete the job
             cursor.execute("""
                 DELETE FROM Jobs 
                 WHERE job_id = %s
             """, (job_id,))
-            
+
             if cursor.rowcount == 0:
                 return False, "Job not found"
-            
+
             conn.commit()
             return True, "Job deleted successfully"
-            
+
         except Exception as e:
             conn.rollback()
             return False, f"Error deleting job: {str(e)}"
@@ -1396,7 +1395,7 @@ class DatabaseManager:
             conn.close()
 
     # Document Management Methods
-    
+
     def get_user_by_email(self, email: str) -> Optional[Dict]:
         """Get user by email address"""
         conn = self.connect()
@@ -1462,25 +1461,25 @@ class DatabaseManager:
         conn = self.connect()
         try:
             cursor = conn.cursor()
-            
+
             # Get document info first for file deletion
             where_clause = "WHERE id = %s"
             params = [doc_id]
             if user_id:
                 where_clause += " AND user_id = %s"
                 params.append(user_id)
-            
+
             cursor.execute(f"SELECT file_path FROM user_documents {where_clause}", params)
             result = cursor.fetchone()
             if not result:
                 return False
-                
+
             file_path = result[0]
-            
+
             # Delete from database
             cursor.execute(f"DELETE FROM user_documents {where_clause}", params)
             success = cursor.rowcount > 0
-            
+
             if success:
                 conn.commit()
                 # Try to delete the actual file
@@ -1489,7 +1488,7 @@ class DatabaseManager:
                         os.remove(file_path)
                 except Exception as e:
                     print(f"Warning: Could not delete file {file_path}: {e}")
-            
+
             return success
         finally:
             conn.close()
@@ -1516,7 +1515,7 @@ class DatabaseManager:
         """Get documents by their IDs"""
         if not doc_ids:
             return []
-            
+
         conn = self.connect()
         try:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
