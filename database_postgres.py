@@ -89,6 +89,34 @@ class DatabaseManager:
                 )
             """)
 
+            # Users table for document management
+            print("Creating users table for document management...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    name VARCHAR(255),
+                    role VARCHAR(20) DEFAULT 'technician' CHECK (role IN ('admin', 'technician')),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # User documents table
+            print("Creating user documents table...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_documents (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    original_name VARCHAR(255) NOT NULL,
+                    file_path VARCHAR(500) NOT NULL,
+                    document_type VARCHAR(100),
+                    file_size INTEGER,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """)
+
             conn.commit()
             print("Database initialization completed successfully!")
         except Exception as e:
@@ -1364,5 +1392,141 @@ class DatabaseManager:
         except Exception as e:
             conn.rollback()
             return False, f"Error deleting job: {str(e)}"
+        finally:
+            conn.close()
+
+    # Document Management Methods
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Get user by email address"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+        finally:
+            conn.close()
+
+    def create_or_update_user(self, email: str, name: str = None, role: str = 'technician') -> int:
+        """Create or update user and return user ID"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO users (email, name, role) 
+                VALUES (%s, %s, %s)
+                ON CONFLICT (email) 
+                DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role
+                RETURNING id
+            """, (email, name, role))
+            user_id = cursor.fetchone()[0]
+            conn.commit()
+            return user_id
+        finally:
+            conn.close()
+
+    def get_user_documents(self, user_id: int) -> List[Dict]:
+        """Get all documents for a specific user"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT * FROM user_documents 
+                WHERE user_id = %s 
+                ORDER BY uploaded_at DESC
+            """, (user_id,))
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def add_user_document(self, user_id: int, file_name: str, original_name: str, 
+                         file_path: str, document_type: str, file_size: int) -> int:
+        """Add a new document for user"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_documents (user_id, file_name, original_name, file_path, document_type, file_size)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (user_id, file_name, original_name, file_path, document_type, file_size))
+            doc_id = cursor.fetchone()[0]
+            conn.commit()
+            return doc_id
+        finally:
+            conn.close()
+
+    def delete_user_document(self, doc_id: int, user_id: int = None) -> bool:
+        """Delete a document (with optional user verification)"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            
+            # Get document info first for file deletion
+            where_clause = "WHERE id = %s"
+            params = [doc_id]
+            if user_id:
+                where_clause += " AND user_id = %s"
+                params.append(user_id)
+            
+            cursor.execute(f"SELECT file_path FROM user_documents {where_clause}", params)
+            result = cursor.fetchone()
+            if not result:
+                return False
+                
+            file_path = result[0]
+            
+            # Delete from database
+            cursor.execute(f"DELETE FROM user_documents {where_clause}", params)
+            success = cursor.rowcount > 0
+            
+            if success:
+                conn.commit()
+                # Try to delete the actual file
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"Warning: Could not delete file {file_path}: {e}")
+            
+            return success
+        finally:
+            conn.close()
+
+    def get_all_technicians(self) -> List[Dict]:
+        """Get all users with technician role"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT u.*, 
+                       COUNT(ud.id) as document_count
+                FROM users u
+                LEFT JOIN user_documents ud ON u.id = ud.user_id
+                WHERE u.role = 'technician'
+                GROUP BY u.id, u.email, u.name, u.role, u.created_at
+                ORDER BY u.name, u.email
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def get_documents_by_ids(self, doc_ids: List[int]) -> List[Dict]:
+        """Get documents by their IDs"""
+        if not doc_ids:
+            return []
+            
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT ud.*, u.name as user_name, u.email as user_email
+                FROM user_documents ud
+                JOIN users u ON ud.user_id = u.id
+                WHERE ud.id = ANY(%s)
+                ORDER BY u.name, ud.uploaded_at
+            """, (doc_ids,))
+            return [dict(row) for row in cursor.fetchall()]
         finally:
             conn.close()

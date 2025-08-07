@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}My Documents{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            {% if current_user_role == 'admin' and user_id != session.user_id %}
+                Documents for {{ user.name or user.email }}
+            {% else %}
+                My Documents
+            {% endif %}
+        </h1>
+        <div>
+            {% if current_user_role == 'admin' %}
+                <span class="badge bg-warning">Admin View</span>
+                <a href="{{ url_for('admin_documents') }}" class="btn btn-outline-primary ms-2">
+                    <i class="fas fa-arrow-left"></i> Back to Admin
+                </a>
+            {% else %}
+                <span class="badge bg-info">Technician</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Upload New Document</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('upload_document', user_id=user_id) }}" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="document" class="form-label">Select File</label>
+                            <input type="file" class="form-control" id="document" name="document" 
+                                   accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif" required>
+                            <div class="form-text">Allowed: PDF, DOC, DOCX, TXT, JPG, PNG, GIF (Max 10MB)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="document_type" class="form-label">Document Type</label>
+                            <select class="form-select" id="document_type" name="document_type">
+                                <option value="certification">Certification</option>
+                                <option value="training">Training Record</option>
+                                <option value="inspection">Inspection Report</option>
+                                <option value="manual">Manual/Guide</option>
+                                <option value="photo">Photo</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-upload"></i> Upload Document
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Documents List -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                Your Documents ({{ documents|length }})
+                {% if current_user_role == 'admin' and documents %}
+                    <button class="btn btn-outline-success btn-sm float-end" onclick="selectAllForBundle()">
+                        Add All to Bundle
+                    </button>
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if documents %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                {% if current_user_role == 'admin' %}
+                                <th width="50">
+                                    <input type="checkbox" id="selectAllDocs" onchange="toggleAllDocuments()">
+                                </th>
+                                {% endif %}
+                                <th>Document Name</th>
+                                <th>Type</th>
+                                <th>Upload Date</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents %}
+                            <tr>
+                                {% if current_user_role == 'admin' %}
+                                <td>
+                                    <input type="checkbox" class="doc-checkbox" 
+                                           value="{{ doc.id }}" 
+                                           data-name="{{ doc.original_name }}" 
+                                           data-user="{{ user.name or user.email }}"
+                                           onchange="updateBundleSelection()">
+                                </td>
+                                {% endif %}
+                                <td>
+                                    <strong>{{ doc.original_name }}</strong>
+                                    {% if doc.document_type %}
+                                        <br><small class="text-muted">{{ doc.document_type|title }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ doc.document_type|title }}</span>
+                                </td>
+                                <td>
+                                    {{ doc.uploaded_at.strftime('%m/%d/%Y %I:%M %p') if doc.uploaded_at else 'Unknown' }}
+                                </td>
+                                <td>
+                                    {% if doc.file_size %}
+                                        {{ "%.1f"|format(doc.file_size / 1024) }} KB
+                                    {% else %}
+                                        Unknown
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-download"></i> Download
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteDocument({{ doc.id }}, '{{ doc.original_name }}')">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                    <h5>No Documents Uploaded</h5>
+                    <p class="text-muted">Use the upload form above to add your first document.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if current_user_role == 'admin' and documents %}
+    <!-- Bundle Creation (Admin Only) -->
+    <div id="bundleSection" class="card mt-4" style="display: none;">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Create Bundle with Selected Documents</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('create_bundle') }}">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="bundle_name" class="form-label">Bundle Name</label>
+                            <input type="text" class="form-control" id="bundle_name" name="bundle_name" 
+                                   value="Documents_{{ user.name|replace(' ', '_') if user.name else user.email.split('@')[0] }}_{{ moment().format('YYYYMMDD') }}">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-success w-100" id="createBundleBtn">
+                                <i class="fas fa-file-pdf"></i> Create Bundle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="selectedDocuments"></div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function deleteDocument(docId, docName) {
+    if (confirm(`Are you sure you want to delete "${docName}"? This action cannot be undone.`)) {
+        fetch(`/documents/delete/${docId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting document: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting document: ' + error);
+        });
+    }
+}
+
+{% if current_user_role == 'admin' %}
+function toggleAllDocuments() {
+    const selectAll = document.getElementById('selectAllDocs');
+    const checkboxes = document.querySelectorAll('.doc-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateBundleSelection();
+}
+
+function updateBundleSelection() {
+    const checkboxes = document.querySelectorAll('.doc-checkbox:checked');
+    const bundleSection = document.getElementById('bundleSection');
+    const selectedDocuments = document.getElementById('selectedDocuments');
+    const createBtn = document.getElementById('createBundleBtn');
+    
+    if (checkboxes.length > 0) {
+        bundleSection.style.display = 'block';
+        
+        // Add hidden inputs for selected documents
+        selectedDocuments.innerHTML = '';
+        checkboxes.forEach(checkbox => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_documents';
+            input.value = checkbox.value;
+            selectedDocuments.appendChild(input);
+        });
+        
+        createBtn.innerHTML = `<i class="fas fa-file-pdf"></i> Create Bundle (${checkboxes.length} docs)`;
+    } else {
+        bundleSection.style.display = 'none';
+    }
+}
+
+function selectAllForBundle() {
+    const selectAll = document.getElementById('selectAllDocs');
+    const checkboxes = document.querySelectorAll('.doc-checkbox');
+    
+    selectAll.checked = true;
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    
+    updateBundleSelection();
+}
+{% endif %}
+</script>
+{% endblock %}

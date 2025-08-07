@@ -502,3 +502,102 @@ def generate_invoice_pdf(invoice: Dict) -> io.BytesIO:
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+
+class DocumentBundler:
+    """PDF bundler for creating document packages"""
+    
+    def __init__(self):
+        self.styles = getSampleStyleSheet()
+        
+    def create_bundle(self, documents: List[Dict], bundle_name: str) -> str:
+        """Create a PDF bundle with document information"""
+        try:
+            # Create temp file for bundle
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            # Create PDF document
+            doc = SimpleDocTemplate(temp_path, pagesize=letter)
+            story = []
+            
+            # Title
+            title = Paragraph(f"<b>Document Bundle: {bundle_name}</b>", self.styles['Title'])
+            story.append(title)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Generated date
+            date_text = f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+            story.append(Paragraph(date_text, self.styles['Normal']))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Document count
+            count_text = f"Total Documents: {len(documents)}"
+            story.append(Paragraph(f"<b>{count_text}</b>", self.styles['Heading2']))
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Table header
+            table_data = [['#', 'Document Name', 'Type', 'User', 'Upload Date', 'Size']]
+            
+            # Add documents to table
+            for i, doc in enumerate(documents, 1):
+                upload_date = doc['uploaded_at'].strftime('%m/%d/%Y') if doc['uploaded_at'] else 'N/A'
+                file_size = f"{doc['file_size'] / 1024:.1f} KB" if doc['file_size'] else 'N/A'
+                user_name = doc.get('user_name', 'Unknown')
+                doc_type = doc.get('document_type', 'other').title()
+                
+                table_data.append([
+                    str(i),
+                    doc['original_name'],
+                    doc_type,
+                    user_name,
+                    upload_date,
+                    file_size
+                ])
+            
+            # Create and style table
+            table = Table(table_data, colWidths=[0.5*inch, 2.5*inch, 1*inch, 1.5*inch, 1*inch, 0.8*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#3498db')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), HexColor('#ecf0f1')),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, HexColor('#bdc3c7')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#ecf0f1'), white]),
+            ]))
+            
+            story.append(table)
+            story.append(Spacer(1, 0.5*inch))
+            
+            # Instructions
+            instructions = """
+            <b>Bundle Contents:</b><br/>
+            This bundle contains references to the documents listed above. 
+            Use the document management system to access individual files.<br/><br/>
+            
+            <b>Access Instructions:</b><br/>
+            1. Log into the Equipment Inventory System<br/>
+            2. Navigate to Document Management<br/>
+            3. Search for documents by user or type<br/>
+            4. Download individual documents as needed<br/><br/>
+            
+            For questions about document access, contact your system administrator.
+            """
+            
+            story.append(Paragraph(instructions, self.styles['Normal']))
+            
+            # Build PDF
+            doc.build(story)
+            
+            return temp_path
+            
+        except Exception as e:
+            print(f"Error creating document bundle: {e}")
+            return None

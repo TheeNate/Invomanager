@@ -1,0 +1,237 @@
+# Detailed Implementation Prompt for Replit
+
+## Project Overview
+Add a document management system to the existing inventory management application. This system will allow technicians to upload PDF documents and administrators to bundle these documents for client submission.
+
+## Database Modifications
+
+### 1. Modify existing users table
+Add a new column to the users table:
+```sql
+ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'technician';
+```
+- Allowed values: 'admin' or 'technician'
+- Default all existing users to 'technician'
+- You'll need to manually update specific users to 'admin' through direct database access
+
+### 2. Create user_documents table
+```sql
+CREATE TABLE user_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  document_type VARCHAR(100),
+  file_size INTEGER,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+## Authentication Flow Modifications
+
+### Modify existing magic link handler:
+After the user clicks the magic link and is authenticated, check their role:
+
+```javascript
+// In your magic link verification endpoint
+if (user.role === 'admin') {
+  // Set session/cookie with full access
+  req.session.userRole = 'admin';
+  res.redirect('/dashboard'); // Or wherever your main app is
+} else {
+  // Set session/cookie with limited access
+  req.session.userRole = 'technician';
+  res.redirect(`/documents/${user.id}`);
+}
+```
+
+### Add middleware for route protection:
+```javascript
+function requireAdmin(req, res, next) {
+  if (req.session.userRole !== 'admin') {
+    return res.redirect(`/documents/${req.session.userId}`);
+  }
+  next();
+}
+
+function requireAuth(req, res, next) {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+  next();
+}
+```
+
+## New Routes to Create
+
+### 1. Technician Document Page
+**Route:** `/documents/:userId`
+- Only accessible if logged-in user ID matches the URL parameter OR user is admin
+- Display user's name at top
+- Show list of uploaded documents in a table with columns:
+  - Document Name
+  - Upload Date
+  - File Size
+  - Delete button
+
+**Features:**
+- File upload form accepting only PDFs
+- Multiple file selection allowed
+- Maximum file size: 10MB per file
+- On successful upload, save file to `/uploads/users/{userId}/{timestamp}_{filename}`
+- Delete button removes file from filesystem and database record
+
+**HTML Structure:**
+```html
+<h1>Documents for [User Name]</h1>
+<form id="upload-form" enctype="multipart/form-data">
+  <input type="file" name="documents" multiple accept=".pdf" />
+  <button type="submit">Upload Documents</button>
+</form>
+<table>
+  <thead>
+    <tr>
+      <th>Document Name</th>
+      <th>Uploaded</th>
+      <th>Size</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Loop through user documents -->
+  </tbody>
+</table>
+```
+
+### 2. Admin Document Management Page
+**Route:** `/admin/documents` (protected by requireAdmin middleware)
+
+**Layout:**
+- Left sidebar: List of all technicians (users with role='technician')
+- Main area: Selected technician's documents
+
+**Features:**
+- Clicking technician name loads their documents via AJAX
+- Each document has a checkbox for selection
+- "Bundle Selected" button at bottom
+- "Select All" / "Deselect All" buttons
+
+### 3. Admin Bundle Creation Page
+**Route:** `/admin/bundle` (protected by requireAdmin middleware)
+
+**Features:**
+- Shows all selected documents grouped by technician
+- "Remove" button next to each technician section
+- "Generate Bundle" button that:
+  1. Creates individual PDF for each technician (combining their selected docs)
+  2. Combines all technician PDFs into one master PDF
+  3. Provides download link
+
+## File Storage Structure
+```
+/uploads/
+  /users/
+    /{userId}/
+      {timestamp}_{original_filename}.pdf
+  /bundles/
+    /temp/
+      {timestamp}_technician_{userId}.pdf
+    {timestamp}_master_bundle.pdf
+```
+
+## Required NPM Packages
+```json
+{
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "multer": "^1.4.5-lts.1",
+    "express-session": "^1.17.3"
+  }
+}
+```
+
+## PDF Bundling Implementation
+
+### For individual technician bundle:
+```javascript
+const { PDFDocument } = require('pdf-lib');
+
+async function bundleTechnicianDocuments(documentPaths) {
+  const mergedPdf = await PDFDocument.create();
+  
+  for (const path of documentPaths) {
+    const pdfBytes = await fs.readFile(path);
+    const pdf = await PDFDocument.load(pdfBytes);
+    const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    pages.forEach((page) => mergedPdf.addPage(page));
+  }
+  
+  const pdfBytes = await mergedPdf.save();
+  return pdfBytes;
+}
+```
+
+### For master bundle:
+Same approach but input is array of technician bundle PDFs
+
+## API Endpoints Needed
+
+### 1. POST `/api/documents/upload`
+- Accept multipart/form-data
+- Validate user can only upload to their own profile (unless admin)
+- Save files and create database records
+- Return success/error message
+
+### 2. DELETE `/api/documents/:documentId`
+- Verify user owns document (or is admin)
+- Delete file from filesystem
+- Delete database record
+- Return success/error
+
+### 3. GET `/api/admin/technicians`
+- Return list of all users with role='technician'
+- Include count of documents for each
+
+### 4. GET `/api/admin/documents/:userId`
+- Return all documents for specified user
+- Admin only
+
+### 5. POST `/api/admin/bundle`
+- Accept array of document IDs grouped by user
+- Generate individual and master PDFs
+- Return download URL
+
+## Security Considerations
+1. Validate all file uploads are actually PDFs
+2. Sanitize filenames to prevent directory traversal
+3. Check user ownership on all document operations
+4. Ensure technicians can ONLY access `/documents/{theirUserId}` route
+
+## UI/UX Requirements
+1. Keep design consistent with existing inventory system
+2. Use existing CSS/styling
+3. Show loading spinners during file uploads and PDF generation
+4. Display clear error messages for:
+   - File too large
+   - Invalid file type
+   - Upload failures
+5. Confirm before deleting documents
+
+## Session Management
+Ensure the existing session system tracks:
+- userId
+- userRole
+- userEmail
+
+Do NOT create a separate authentication system. Modify the existing magic link system only as specified above.
+
+## Testing Checklist
+1. Technician can only see their own document page
+2. Admin can see all technicians and their documents
+3. File upload works for PDFs only
+4. Delete removes both file and database record
+5. Bundle generation creates valid PDFs
+6. Non-PDF files are rejected
+7. Large files (>10MB) are rejected

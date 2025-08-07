@@ -8,6 +8,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from datetime import date, datetime
 import os
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+import mimetypes
 from database_postgres import DatabaseManager
 from auth import MagicLinkAuth
 from models import EquipmentStatus, InspectionResult, JobStatus, PaymentStatus
@@ -21,6 +23,18 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# File upload configuration
+UPLOAD_FOLDER = 'uploads'
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'gif'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 
@@ -180,10 +194,19 @@ def auth_verify():
         # Log in user
         auth.login_user(email)
 
-        # Redirect to originally requested page or home
-        next_url = session.pop('next_url', None)
+        # Redirect based on role
+        user_role = session.get('user_role', 'technician')
+        user_id = session.get('user_id')
+        
         flash(f'Welcome! You are now logged in as {email}', 'success')
-        return redirect(next_url or url_for('index'))
+        
+        if user_role == 'admin':
+            # Admin goes to main dashboard
+            next_url = session.pop('next_url', None)
+            return redirect(next_url or url_for('index'))
+        else:
+            # Technicians go to their document page
+            return redirect(url_for('user_documents', user_id=user_id))
     else:
         flash('Invalid or expired login link. Please request a new one.', 'error')
         return redirect(url_for('auth_login'))
@@ -1398,6 +1421,181 @@ def delete_job(job_id):
     except Exception as e:
         flash(f'Error deleting job: {str(e)}', 'error')
         return redirect(url_for('job_details', job_id=job_id))
+
+# Document Management Routes
+
+@app.route('/documents/admin')
+@auth.require_admin
+def admin_documents():
+    """Admin dashboard for document management"""
+    try:
+        technicians = db_manager.get_all_technicians()
+        return render_template('admin_documents.html', technicians=technicians)
+    except Exception as e:
+        flash(f'Error loading document dashboard: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/documents/user/<int:user_id>')
+@auth.require_user_or_admin
+def user_documents(user_id):
+    """User document management page"""
+    try:
+        user = db_manager.get_user_by_email(session['user_email'])
+        documents = db_manager.get_user_documents(user_id)
+        current_user_role = session.get('user_role', 'technician')
+        
+        return render_template('user_documents.html', 
+                             user=user,
+                             documents=documents, 
+                             user_id=user_id,
+                             current_user_role=current_user_role)
+    except Exception as e:
+        flash(f'Error loading documents: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/documents/upload/<int:user_id>', methods=['POST'])
+@auth.require_user_or_admin
+def upload_document(user_id):
+    """Upload a document for a user"""
+    try:
+        if 'document' not in request.files:
+            flash('No file selected', 'error')
+            return redirect(url_for('user_documents', user_id=user_id))
+        
+        file = request.files['document']
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(url_for('user_documents', user_id=user_id))
+        
+        if not allowed_file(file.filename):
+            flash('File type not allowed', 'error')
+            return redirect(url_for('user_documents', user_id=user_id))
+        
+        # Create uploads directory if it doesn't exist
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        
+        # Generate secure filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        unique_filename = f"{timestamp}{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        # Save file
+        file.save(file_path)
+        
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        document_type = request.form.get('document_type', 'other')
+        
+        # Save to database
+        doc_id = db_manager.add_user_document(
+            user_id=user_id,
+            file_name=unique_filename,
+            original_name=filename,
+            file_path=file_path,
+            document_type=document_type,
+            file_size=file_size
+        )
+        
+        flash('Document uploaded successfully!', 'success')
+        return redirect(url_for('user_documents', user_id=user_id))
+        
+    except Exception as e:
+        flash(f'Error uploading document: {str(e)}', 'error')
+        return redirect(url_for('user_documents', user_id=user_id))
+
+@app.route('/documents/download/<int:doc_id>')
+@auth.require_auth
+def download_document(doc_id):
+    """Download a document"""
+    try:
+        # Get document info
+        documents = db_manager.get_documents_by_ids([doc_id])
+        if not documents:
+            flash('Document not found', 'error')
+            return redirect(url_for('index'))
+        
+        document = documents[0]
+        
+        # Check permissions (users can only download their own docs, admins can download any)
+        if session.get('user_role') != 'admin' and document['user_id'] != session.get('user_id'):
+            flash('Access denied', 'error')
+            return redirect(url_for('user_documents', user_id=session.get('user_id')))
+        
+        file_path = document['file_path']
+        if not os.path.exists(file_path):
+            flash('File not found on server', 'error')
+            return redirect(url_for('user_documents', user_id=document['user_id']))
+        
+        return send_file(file_path, as_attachment=True, 
+                        download_name=document['original_name'])
+        
+    except Exception as e:
+        flash(f'Error downloading document: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/documents/delete/<int:doc_id>', methods=['POST'])
+@auth.require_user_or_admin
+def delete_document(doc_id):
+    """Delete a document"""
+    try:
+        # Get document info for permission check
+        documents = db_manager.get_documents_by_ids([doc_id])
+        if not documents:
+            return jsonify({'success': False, 'message': 'Document not found'})
+        
+        document = documents[0]
+        user_id = document['user_id']
+        
+        # Check permissions
+        if session.get('user_role') != 'admin' and user_id != session.get('user_id'):
+            return jsonify({'success': False, 'message': 'Access denied'})
+        
+        # Delete document
+        if db_manager.delete_user_document(doc_id, user_id):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to delete document'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/documents/bundle/create', methods=['POST'])
+@auth.require_admin
+def create_bundle():
+    """Create document bundle (admin only)"""
+    try:
+        selected_docs = request.form.getlist('selected_documents')
+        if not selected_docs:
+            flash('No documents selected for bundle', 'error')
+            return redirect(url_for('admin_documents'))
+        
+        # Convert to integers
+        doc_ids = [int(doc_id) for doc_id in selected_docs]
+        
+        # Get document information
+        documents = db_manager.get_documents_by_ids(doc_ids)
+        if not documents:
+            flash('Selected documents not found', 'error')
+            return redirect(url_for('admin_documents'))
+        
+        # Create bundle (PDF with document list)
+        from pdf_export import DocumentBundler
+        bundler = DocumentBundler()
+        
+        bundle_name = request.form.get('bundle_name', f'Document_Bundle_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+        bundle_path = bundler.create_bundle(documents, bundle_name)
+        
+        if bundle_path:
+            return send_file(bundle_path, as_attachment=True, 
+                           download_name=f'{bundle_name}.pdf')
+        else:
+            flash('Error creating document bundle', 'error')
+            return redirect(url_for('admin_documents'))
+        
+    except Exception as e:
+        flash(f'Error creating bundle: {str(e)}', 'error')
+        return redirect(url_for('admin_documents'))
 
 if __name__ == '__main__':
     # Use production mode for deployment

@@ -224,6 +224,16 @@ Equipment Inventory System
                     )
                     conn.commit()
                     
+                    # Create or update user record and set session
+                    user_id = self.db.create_or_update_user(email)
+                    user = self.db.get_user_by_email(email)
+                    
+                    # Set session with role information
+                    session['authenticated'] = True
+                    session['user_email'] = email
+                    session['user_id'] = user_id
+                    session['user_role'] = user['role'] if user else 'technician'
+                    
                     return email
                     
         except Exception as e:
@@ -243,7 +253,7 @@ Equipment Inventory System
     
     def is_authenticated(self) -> bool:
         """Check if user is currently authenticated"""
-        return session.get('logged_in', False)
+        return session.get('authenticated', False)
     
     def get_current_user(self) -> Optional[str]:
         """Get current user's email"""
@@ -263,4 +273,46 @@ Equipment Inventory System
                 session['next_url'] = request.url
                 return redirect(url_for('auth_login'))
             return f(*args, **kwargs)
+        return decorated_function
+
+    def require_admin(self, f):
+        """Decorator to require admin authentication"""
+        from functools import wraps
+        from flask import redirect, url_for
+        
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not self.is_authenticated():
+                session['next_url'] = request.url
+                return redirect(url_for('auth_login'))
+            if session.get('user_role') != 'admin':
+                # Redirect technicians to their document page
+                user_id = session.get('user_id')
+                if user_id:
+                    return redirect(url_for('user_documents', user_id=user_id))
+                return redirect(url_for('auth_login'))
+            return f(*args, **kwargs)
+        return decorated_function
+
+    def require_user_or_admin(self, f):
+        """Decorator to require user to access their own data or be admin"""
+        from functools import wraps
+        from flask import redirect, url_for
+        
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not self.is_authenticated():
+                session['next_url'] = request.url
+                return redirect(url_for('auth_login'))
+            
+            user_id = kwargs.get('user_id')
+            session_user_id = session.get('user_id')
+            user_role = session.get('user_role')
+            
+            # Allow access if user is admin OR accessing their own data
+            if user_role == 'admin' or str(session_user_id) == str(user_id):
+                return f(*args, **kwargs)
+            else:
+                # Redirect to their own documents page
+                return redirect(url_for('user_documents', user_id=session_user_id))
         return decorated_function

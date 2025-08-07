@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Document Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Document Management</h1>
+        <div>
+            <span class="badge bg-info">Admin View</span>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Technicians</h5>
+                    <h2 class="text-primary">{{ technicians|length }}</h2>
+                    <p class="card-text text-muted">Active users with document access</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Documents</h5>
+                    <h2 class="text-success">{{ technicians|sum(attribute='document_count') }}</h2>
+                    <p class="card-text text-muted">Documents across all users</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Bundle Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Create Document Bundle</h5>
+        </div>
+        <div class="card-body">
+            <form id="bundleForm" method="POST" action="{{ url_for('create_bundle') }}">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="bundle_name" class="form-label">Bundle Name</label>
+                            <input type="text" class="form-control" id="bundle_name" name="bundle_name" 
+                                   placeholder="Enter bundle name..." value="Document_Package_{{ moment().format('YYYYMMDD') }}">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-success w-100" id="createBundleBtn" disabled>
+                                <i class="fas fa-file-pdf"></i> Create Bundle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="text-muted">Select documents below to include in the bundle. The bundle will create a PDF summary with document details.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Technicians and Documents -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Technicians & Documents</h5>
+            <div>
+                <button class="btn btn-outline-primary btn-sm" onclick="selectAll()">Select All</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="selectNone()">Select None</button>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if technicians %}
+                {% for technician in technicians %}
+                <div class="technician-section mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">
+                            <i class="fas fa-user"></i>
+                            {{ technician.name or technician.email }}
+                            <span class="badge bg-secondary ms-2">{{ technician.document_count }} docs</span>
+                        </h6>
+                        <div>
+                            <a href="{{ url_for('user_documents', user_id=technician.id) }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-folder-open"></i> View Documents
+                            </a>
+                        </div>
+                    </div>
+                    
+                    {% if technician.document_count > 0 %}
+                    <div class="documents-preview">
+                        <small class="text-muted">Click "View Documents" to see individual files and select for bundle</small>
+                    </div>
+                    {% else %}
+                    <div class="text-muted">
+                        <small><i class="fas fa-info-circle"></i> No documents uploaded yet</small>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if not loop.last %}
+                <hr>
+                {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h5>No Technicians Found</h5>
+                    <p class="text-muted">No technician users have been created yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Selected Documents Display (will be populated by JavaScript) -->
+    <div id="selectedDocuments" class="card mt-4" style="display: none;">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Selected Documents for Bundle</h5>
+        </div>
+        <div class="card-body" id="selectedDocsList">
+            <!-- Selected documents will be listed here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedDocuments = [];
+
+function selectAll() {
+    // This would select all documents if we had them loaded
+    // For now, just show message
+    alert('Use the "View Documents" links to select individual documents for bundling.');
+}
+
+function selectNone() {
+    selectedDocuments = [];
+    updateSelectedDocuments();
+    updateBundleButton();
+}
+
+function toggleDocument(docId, docName, userName) {
+    const index = selectedDocuments.findIndex(doc => doc.id === docId);
+    
+    if (index > -1) {
+        selectedDocuments.splice(index, 1);
+    } else {
+        selectedDocuments.push({id: docId, name: docName, user: userName});
+    }
+    
+    updateSelectedDocuments();
+    updateBundleButton();
+}
+
+function updateSelectedDocuments() {
+    const container = document.getElementById('selectedDocuments');
+    const list = document.getElementById('selectedDocsList');
+    
+    if (selectedDocuments.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let html = '<div class="row">';
+    selectedDocuments.forEach(doc => {
+        html += `
+            <div class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded">
+                    <div>
+                        <strong>${doc.name}</strong><br>
+                        <small class="text-muted">User: ${doc.user}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="toggleDocument(${doc.id}, '${doc.name}', '${doc.user}')">
+                        Remove
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    list.innerHTML = html;
+}
+
+function updateBundleButton() {
+    const btn = document.getElementById('createBundleBtn');
+    btn.disabled = selectedDocuments.length === 0;
+    btn.innerHTML = selectedDocuments.length > 0 
+        ? `<i class="fas fa-file-pdf"></i> Create Bundle (${selectedDocuments.length} docs)`
+        : '<i class="fas fa-file-pdf"></i> Create Bundle';
+}
+
+// Handle form submission
+document.getElementById('bundleForm').addEventListener('submit', function(e) {
+    if (selectedDocuments.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one document for the bundle.');
+        return;
+    }
+    
+    // Add hidden inputs for selected documents
+    selectedDocuments.forEach(doc => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_documents';
+        input.value = doc.id;
+        this.appendChild(input);
+    });
+});
+
+// Initialize
+updateBundleButton();
+</script>
+{% endblock %}
