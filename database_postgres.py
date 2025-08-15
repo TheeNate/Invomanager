@@ -1496,7 +1496,7 @@ class DatabaseManager:
             conn.close()
 
     def get_all_technicians(self) -> List[Dict]:
-        """Get all users with technician role"""
+        """Get all users (both technicians and admins) for document management"""
         conn = self.connect()
         try:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -1505,9 +1505,9 @@ class DatabaseManager:
                        COUNT(ud.id) as document_count
                 FROM users u
                 LEFT JOIN user_documents ud ON u.id = ud.user_id
-                WHERE u.role = 'technician'
-                GROUP BY u.id, u.email, u.name, u.role, u.created_at
-                ORDER BY u.name, u.email
+                WHERE u.role IN ('technician', 'admin')
+                GROUP BY u.id, u.email, u.name, u.role, u.created_at, u.access_level
+                ORDER BY u.role DESC, u.name, u.email
             """)
             return [dict(row) for row in cursor.fetchall()]
         finally:

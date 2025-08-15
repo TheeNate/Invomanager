@@ -1456,52 +1456,75 @@ def user_documents(user_id):
 @app.route('/documents/upload/<int:user_id>', methods=['POST'])
 @auth.require_user_or_admin
 def upload_document(user_id):
-    """Upload a document for a user"""
+    """Upload one or more documents for a user"""
     try:
         if 'document' not in request.files:
             flash('No file selected', 'error')
             return redirect(url_for('user_documents', user_id=user_id))
         
-        file = request.files['document']
-        if file.filename == '':
+        files = request.files.getlist('document')
+        if not files or (len(files) == 1 and files[0].filename == ''):
             flash('No file selected', 'error')
             return redirect(url_for('user_documents', user_id=user_id))
         
-        if not allowed_file(file.filename):
-            flash('File type not allowed', 'error')
-            return redirect(url_for('user_documents', user_id=user_id))
+        uploaded_count = 0
+        failed_files = []
         
         # Create uploads directory if it doesn't exist
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         
-        # Generate secure filename
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        unique_filename = f"{timestamp}{filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        for file in files:
+            if file.filename == '':
+                continue
+                
+            if not allowed_file(file.filename):
+                failed_files.append(f"{file.filename} (invalid file type)")
+                continue
+            
+            try:
+                # Generate secure filename
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                unique_filename = f"{timestamp}{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                
+                # Save file
+                file.save(file_path)
+                
+                # Get file info
+                file_size = os.path.getsize(file_path)
+                document_type = request.form.get('document_type', 'other')
+                
+                # Save to database
+                doc_id = db_manager.add_user_document(
+                    user_id=user_id,
+                    file_name=unique_filename,
+                    original_name=filename,
+                    file_path=file_path,
+                    document_type=document_type,
+                    file_size=file_size
+                )
+                uploaded_count += 1
+                
+            except Exception as e:
+                print(f"Error uploading {file.filename}: {e}")
+                failed_files.append(f"{file.filename} (upload error)")
+                continue
         
-        # Save file
-        file.save(file_path)
+        # Show results
+        if uploaded_count > 0:
+            flash(f'Successfully uploaded {uploaded_count} document(s)!', 'success')
         
-        # Get file info
-        file_size = os.path.getsize(file_path)
-        document_type = request.form.get('document_type', 'other')
+        if failed_files:
+            flash(f'Failed to upload: {", ".join(failed_files)}', 'warning')
         
-        # Save to database
-        doc_id = db_manager.add_user_document(
-            user_id=user_id,
-            file_name=unique_filename,
-            original_name=filename,
-            file_path=file_path,
-            document_type=document_type,
-            file_size=file_size
-        )
+        if uploaded_count == 0:
+            flash('No documents were uploaded successfully', 'error')
         
-        flash('Document uploaded successfully!', 'success')
         return redirect(url_for('user_documents', user_id=user_id))
         
     except Exception as e:
-        flash(f'Error uploading document: {str(e)}', 'error')
+        flash(f'Error uploading documents: {str(e)}', 'error')
         return redirect(url_for('user_documents', user_id=user_id))
 
 @app.route('/documents/download/<int:doc_id>')
