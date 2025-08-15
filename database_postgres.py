@@ -1407,18 +1407,20 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def create_or_update_user(self, email: str, name: str = None, role: str = 'technician') -> int:
-        """Create or update user and return user ID"""
+    def create_or_update_user(self, email: str, name: str = None, role: str = 'technician', access_level: str = 'full') -> int:
+        """Create or update user with role and access level, return user ID"""
         conn = self.connect()
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO users (email, name, role) 
-                VALUES (%s, %s, %s)
+                INSERT INTO users (email, name, role, access_level) 
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (email) 
-                DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name)
+                DO UPDATE SET 
+                    name = COALESCE(EXCLUDED.name, users.name),
+                    access_level = EXCLUDED.access_level
                 RETURNING id
-            """, (email, name, role))
+            """, (email, name, role, access_level))
             user_id = cursor.fetchone()[0]
             conn.commit()
             return user_id

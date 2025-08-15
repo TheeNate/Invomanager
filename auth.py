@@ -24,18 +24,41 @@ class MagicLinkAuth:
             print("WARNING: No allowed emails configured. Set ALLOWED_EMAILS environment variable.")
         
     def is_email_allowed(self, email: str) -> bool:
-        """Check if email is in the allowed list"""
-        if not self.allowed_emails:
-            # If no allowed emails are configured, deny access for security
+        """Check if email is in the allowed emails database table"""
+        try:
+            with self.db.connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id FROM allowed_emails WHERE email = %s AND is_active = TRUE", 
+                    (email.lower(),)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            print(f"Error checking email authorization: {e}")
             return False
-        
-        return email.lower() in self.allowed_emails
+
+    def add_allowed_email(self, email: str, admin_id: int) -> bool:
+        """Add email to allowed list"""
+        try:
+            with self.db.connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """INSERT INTO allowed_emails (email, added_by_admin_id) 
+                       VALUES (%s, %s) ON CONFLICT (email) DO NOTHING""",
+                    (email.lower(), admin_id)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error adding allowed email: {e}")
+            return False
     
-    def generate_magic_link(self, email: str) -> str:
+    def generate_magic_link(self, email: str, is_invite: bool = False) -> str:
         """Generate a magic link for the given email"""
         # Check if email is authorized
         if not self.is_email_allowed(email):
-            raise ValueError("Email not authorized for access")
+            if not is_invite:
+                raise ValueError("Email not authorized for access")
         
         # Generate secure token
         token = secrets.token_urlsafe(32)
@@ -78,7 +101,7 @@ class MagicLinkAuth:
         magic_link = url_for('auth_verify', token=token, _external=True)
         return magic_link
     
-    def send_magic_link(self, email: str, magic_link: str) -> bool:
+    def send_magic_link(self, email: str, magic_link: str, is_invite: bool = False) -> bool:
         """Send magic link via Resend API"""
         try:
             # Get Resend API key from environment
@@ -92,50 +115,109 @@ class MagicLinkAuth:
                 print("ERROR: Resend API key not configured")
                 return False
             
-            # Email content
-            html_body = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
-                    .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
-                    .login-button {{ display: inline-block; background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
-                    .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>🔧 Equipment Inventory Access</h2>
-                    </div>
-                    <div class="content">
-                        <h3>Secure Login Link</h3>
-                        <p>Hello,</p>
-                        <p>Click the button below to securely access your Equipment Inventory System:</p>
-                        
-                        <p style="text-align: center;">
-                            <a href="{magic_link}" class="login-button">Access Equipment Inventory</a>
-                        </p>
-                        
-                        <p><strong>Important:</strong> This link will expire in {self.token_expiry_hours} hour(s) for security.</p>
-                        
-                        <p>If you didn't request this login, you can safely ignore this email.</p>
-                        
-                        <div class="footer">
-                            <p>Equipment Inventory Management System<br>
-                            Safety Equipment Tracking & Compliance</p>
+            # Email content based on whether it's an invite or regular login
+            if is_invite:
+                subject = 'You\'ve been invited to Equipment Inventory System'
+                html_body = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                        .header {{ background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+                        .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
+                        .login-button {{ display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                        .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>Welcome to Equipment Inventory</h1>
+                        </div>
+                        <div class="content">
+                            <h2>You've been invited!</h2>
+                            <p>An administrator has invited you to access the Equipment Inventory document management system.</p>
+                            <p>Click the button below to access your document upload area:</p>
+                            <p style="text-align: center;">
+                                <a href="{magic_link}" class="login-button">Access Document Area</a>
+                            </p>
+                            <p><strong>This link expires in {self.token_expiry_hours} hour.</strong></p>
+                            <p>You will have access to upload and manage your documents. For any questions, contact your system administrator.</p>
+                            <div class="footer">
+                                <p>Equipment Inventory Management System<br>
+                                Safety Equipment Tracking & Compliance</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            text_body = f"""
+                </body>
+                </html>
+                """
+                text_body = f"""
+Equipment Inventory Invitation
+
+Hello,
+
+An administrator has invited you to access the Equipment Inventory document management system.
+
+Click the link below to access your document upload area:
+
+{magic_link}
+
+This link expires in {self.token_expiry_hours} hour.
+
+You will have access to upload and manage your documents. For any questions, contact your system administrator.
+
+Best regards,
+Equipment Inventory System
+"""
+            else:
+                subject = 'Equipment Inventory Login Link'
+                html_body = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                        .header {{ background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+                        .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
+                        .login-button {{ display: inline-block; background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                        .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h2>🔧 Equipment Inventory Access</h2>
+                        </div>
+                        <div class="content">
+                            <h3>Secure Login Link</h3>
+                            <p>Hello,</p>
+                            <p>Click the button below to securely access your Equipment Inventory System:</p>
+                            
+                            <p style="text-align: center;">
+                                <a href="{magic_link}" class="login-button">Access Equipment Inventory</a>
+                            </p>
+                            
+                            <p><strong>Important:</strong> This link will expire in {self.token_expiry_hours} hour(s) for security.</p>
+                            
+                            <p>If you didn't request this login, you can safely ignore this email.</p>
+                            
+                            <div class="footer">
+                                <p>Equipment Inventory Management System<br>
+                                Safety Equipment Tracking & Compliance</p>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                text_body = f"""
 Equipment Inventory Login Link
 
 Hello,
@@ -157,7 +239,7 @@ Equipment Inventory System
             payload = {
                 'from': from_email,
                 'to': [email],
-                'subject': 'Equipment Inventory Login Link',
+                'subject': subject,
                 'html': html_body,
                 'text': text_body
             }
@@ -224,23 +306,26 @@ Equipment Inventory System
                     )
                     conn.commit()
                     
-                    # Get existing user first to preserve role
+                    # Get existing user first to preserve role and access level
                     existing_user = self.db.get_user_by_email(email)
                     
                     if existing_user:
-                        # User exists, preserve their role
+                        # User exists, preserve their role and access level
                         user_id = existing_user['id']
                         user_role = existing_user['role']
+                        access_level = existing_user.get('access_level', 'full')
                     else:
-                        # New user, create with default technician role
+                        # New user, create with default technician role and full access
                         user_id = self.db.create_or_update_user(email)
                         user_role = 'technician'
+                        access_level = 'full'
                     
-                    # Set session with role information
+                    # Set session with role and access level information
                     session['authenticated'] = True
                     session['user_email'] = email
                     session['user_id'] = user_id
                     session['user_role'] = user_role
+                    session['access_level'] = access_level
                     
                     return email
                     
@@ -323,4 +408,24 @@ Equipment Inventory System
             else:
                 # Redirect to their own documents page
                 return redirect(url_for('user_documents', user_id=session_user_id))
+        return decorated_function
+
+    def require_full_access(self, f):
+        """Decorator to restrict routes to full-access users only"""
+        from functools import wraps
+        from flask import redirect, url_for
+        
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not self.is_authenticated():
+                session['next_url'] = request.url
+                return redirect(url_for('auth_login'))
+            
+            access_level = session.get('access_level', 'full')
+            if access_level != 'full':
+                # Redirect restricted users to their documents page
+                user_id = session.get('user_id')
+                return redirect(url_for('user_documents', user_id=user_id))
+            
+            return f(*args, **kwargs)
         return decorated_function

@@ -1,0 +1,479 @@
+# Technician Invite System Implementation
+
+## Overview
+Add an "Invite Tech" button to the admin documents page that allows admins to invite new technicians via email. Invited users will have restricted access to only their document upload page.
+
+## Database Modifications
+
+### 1. Create allowed_emails table
+Replace the environment variable approach with a database table:
+```sql
+CREATE TABLE allowed_emails (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    added_by_admin_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+```
+
+### 2. Migrate existing ALLOWED_EMAILS
+Create a migration script to move existing environment variable emails to the database table.
+
+### 3. Add user restriction field
+Add a column to track user access level:
+```sql
+ALTER TABLE users ADD COLUMN access_level VARCHAR(20) DEFAULT 'full';
+```
+- 'full' = admin users (can access entire system)
+- 'documents_only' = invited technicians (restricted to documents page only)
+
+## Authentication System Modifications
+
+### 1. Update MagicLinkAuth class in auth.py
+
+#### Replace is_email_allowed method:
+```python
+def is_email_allowed(self, email: str) -> bool:
+    """Check if email is in the allowed emails database table"""
+    try:
+        with self.db.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM allowed_emails WHERE email = %s AND is_active = TRUE", 
+                (email.lower(),)
+            )
+            return cursor.fetchone() is not None
+    except Exception as e:
+        print(f"Error checking email authorization: {e}")
+        return False
+
+def add_allowed_email(self, email: str, admin_id: int) -> bool:
+    """Add email to allowed list"""
+    try:
+        with self.db.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO allowed_emails (email, added_by_admin_id) 
+                   VALUES (%s, %s) ON CONFLICT (email) DO NOTHING""",
+                (email.lower(), admin_id)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error adding allowed email: {e}")
+        return False
+```
+
+#### Update generate_magic_link method:
+Add parameter to distinguish invite vs regular login:
+```python
+def generate_magic_link(self, email: str, is_invite: bool = False) -> str:
+    """Generate a magic link for the given email"""
+    if not self.is_email_allowed(email):
+        if not is_invite:
+            raise ValueError("Email not authorized for access")
+    
+    # Rest of existing logic unchanged
+```
+
+#### Update send_magic_link method:
+Add different email templates for invites:
+```python
+def send_magic_link(self, email: str, magic_link: str, is_invite: bool = False) -> bool:
+    """Send magic link via Resend API"""
+    if is_invite:
+        subject = 'You\'ve been invited to Equipment Inventory System'
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+                .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
+                .login-button {{ display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Welcome to Equipment Inventory</h1>
+                </div>
+                <div class="content">
+                    <h2>You've been invited!</h2>
+                    <p>An administrator has invited you to access the Equipment Inventory document management system.</p>
+                    <p>Click the button below to access your document upload area:</p>
+                    <p style="text-align: center;">
+                        <a href="{magic_link}" class="login-button">Access Document Area</a>
+                    </p>
+                    <p><strong>This link expires in 1 hour.</strong></p>
+                    <p>You will have access to upload and manage your documents. For any questions, contact your system administrator.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        # Use existing login email template
+        subject = 'Equipment Inventory Login Link'
+        # Existing HTML content
+    
+    # Rest of existing send logic unchanged
+```
+
+### 2. Update user creation logic
+
+#### Modify DatabaseManager.create_or_update_user:
+```python
+def create_or_update_user(self, email, role='technician', access_level='full'):
+    """Create or update user with role and access level"""
+    try:
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            
+            # Check if user exists
+            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+            existing_user = cursor.fetchone()
+            
+            if existing_user:
+                return existing_user[0]
+            else:
+                # Create new user
+                cursor.execute(
+                    """INSERT INTO users (email, role, access_level) 
+                       VALUES (%s, %s, %s) RETURNING id""",
+                    (email, role, access_level)
+                )
+                user_id = cursor.fetchone()[0]
+                conn.commit()
+                return user_id
+    except Exception as e:
+        print(f"Error creating/updating user: {e}")
+        raise
+```
+
+### 3. Add navigation restriction decorator
+
+#### Add to auth.py:
+```python
+def require_full_access(self, f):
+    """Decorator to restrict routes to full-access users only"""
+    from functools import wraps
+    from flask import redirect, url_for, session
+    
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not self.is_authenticated():
+            session['next_url'] = request.url
+            return redirect(url_for('auth_login'))
+        
+        access_level = session.get('access_level', 'full')
+        if access_level != 'full':
+            # Redirect restricted users to their documents page
+            user_id = session.get('user_id')
+            return redirect(url_for('user_documents', user_id=user_id))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+```
+
+## Frontend Modifications
+
+### 1. Update admin_documents.html
+
+#### Add Invite Tech button next to Select All/Select None:
+```html
+<!-- In the Technicians & Documents card header -->
+<div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="card-title mb-0">Technicians & Documents</h5>
+    <div>
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#inviteTechModal">
+            <i class="fas fa-user-plus"></i> Invite Tech
+        </button>
+        <button class="btn btn-outline-primary btn-sm" onclick="selectAll()">Select All</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="selectNone()">Select None</button>
+    </div>
+</div>
+```
+
+#### Add modal at the end of the template:
+```html
+<!-- Invite Technician Modal -->
+<div class="modal fade" id="inviteTechModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Invite New Technician</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="inviteTechForm" method="POST" action="{{ url_for('invite_technician') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="techEmail" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="techEmail" name="email" required>
+                        <div class="form-text">The technician will receive an email with a link to access their document upload area.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane"></i> Send Invite
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle invite form submission
+document.getElementById('inviteTechForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('techEmail').value;
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    submitBtn.disabled = true;
+    
+    // Submit form
+    fetch(this.action, {
+        method: 'POST',
+        body: new FormData(this)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('inviteTechModal')).hide();
+            
+            // Show success message (you'll need to implement flash message display)
+            location.reload(); // Refresh to show new technician
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while sending the invite.');
+    })
+    .finally(() => {
+        // Reset button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+</script>
+```
+
+### 2. Create restricted base template
+
+#### Create templates/base_restricted.html:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Equipment Inventory{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Minimal header for restricted users -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand">Equipment Inventory - Documents</span>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('auth_logout') }}">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+```
+
+### 3. Update user_documents.html
+
+#### Add conditional template extension:
+```html
+{% if session.access_level == 'documents_only' %}
+    {% extends "base_restricted.html" %}
+{% else %}
+    {% extends "base.html" %}
+{% endif %}
+```
+
+## Backend Route Implementation
+
+### Add to app.py:
+
+```python
+@app.route('/admin/invite-technician', methods=['POST'])
+@auth.require_admin
+def invite_technician():
+    """Invite a new technician via email"""
+    try:
+        email = request.form.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'success': False, 'message': 'Email address is required'})
+        
+        # Validate email format
+        import re
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+            return jsonify({'success': False, 'message': 'Invalid email format'})
+        
+        # Check if user already exists
+        existing_user = db_manager.get_user_by_email(email)
+        if existing_user:
+            return jsonify({'success': False, 'message': 'User already exists in the system'})
+        
+        # Add email to allowed list
+        admin_id = session.get('user_id')
+        if not auth.add_allowed_email(email, admin_id):
+            return jsonify({'success': False, 'message': 'Failed to authorize email'})
+        
+        # Create user record immediately
+        user_id = db_manager.create_or_update_user(
+            email=email, 
+            role='technician', 
+            access_level='documents_only'
+        )
+        
+        # Generate and send magic link
+        magic_link = auth.generate_magic_link(email, is_invite=True)
+        email_sent = auth.send_magic_link(email, magic_link, is_invite=True)
+        
+        if email_sent:
+            return jsonify({
+                'success': True, 
+                'message': f'Invitation sent successfully to {email}'
+            })
+        else:
+            # Rollback user creation if email fails
+            db_manager.delete_user(user_id)  # You'll need to implement this method
+            return jsonify({'success': False, 'message': 'Failed to send invitation email'})
+            
+    except Exception as e:
+        print(f"Error inviting technician: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while sending the invitation'})
+```
+
+### Update session management in auth.py
+
+#### Modify login_user method:
+```python
+def login_user(self, email: str):
+    """Log in user and set session data"""
+    user = self.db.get_user_by_email(email)
+    
+    if user:
+        session['user_id'] = user['id']
+        session['user_email'] = email
+        session['user_role'] = user['role']
+        session['access_level'] = user.get('access_level', 'full')
+        session['logged_in'] = True
+        print(f"User logged in: {email} (Role: {user['role']}, Access: {session['access_level']})")
+    else:
+        raise ValueError("User not found")
+```
+
+### Apply access restrictions to existing routes
+
+#### Update existing route decorators:
+```python
+# Change from @auth.require_admin to:
+@app.route('/dashboard')
+@auth.require_full_access
+def index():
+    # Existing dashboard code
+
+@app.route('/equipment')
+@auth.require_full_access  
+def equipment_list():
+    # Existing equipment code
+
+# Apply to all admin/equipment routes except user_documents
+```
+
+## Database Helper Methods
+
+### Add to DatabaseManager:
+
+```python
+def delete_user(self, user_id):
+    """Delete user and their documents"""
+    try:
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            # Delete user documents first
+            cursor.execute("DELETE FROM user_documents WHERE user_id = %s", (user_id,))
+            # Delete user
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+            conn.commit()
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        raise
+
+def get_user_by_email(self, email):
+    """Get user by email including role and access_level"""
+    try:
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, email, role, access_level FROM users WHERE email = %s", 
+                (email,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'email': result[1], 
+                    'role': result[2],
+                    'access_level': result[3]
+                }
+            return None
+    except Exception as e:
+        print(f"Error getting user by email: {e}")
+        return None
+```
+
+## Testing Checklist
+
+1. Admin can click "Invite Tech" button and modal opens
+2. Email validation works (required, proper format)
+3. Duplicate email prevention works
+4. Magic link email is sent with invite-specific content
+5. Invited user can click link and access only document page
+6. Restricted user cannot access other routes (redirected to documents)
+7. Restricted user sees minimal navigation (no admin options)
+8. Restricted user can upload/delete their own documents
+9. Admin can see new technician in the list after invite
+10. Session management properly tracks access_level

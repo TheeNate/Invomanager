@@ -69,6 +69,9 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">Technicians & Documents</h5>
             <div>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#inviteTechModal">
+                    <i class="fas fa-user-plus"></i> Invite Tech
+                </button>
                 <button class="btn btn-outline-primary btn-sm" onclick="selectAll()">Select All</button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="selectNone()">Select None</button>
             </div>
@@ -228,6 +231,104 @@ document.addEventListener('DOMContentLoaded', function() {
                        String(today.getDate()).padStart(2, '0');
         bundleNameInput.value = 'Document_Package_' + dateStr;
     }
+});
+</script>
+
+<!-- Invite Technician Modal -->
+<div class="modal fade" id="inviteTechModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Invite New Technician</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="inviteTechForm" method="POST" action="{{ url_for('invite_technician') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="techEmail" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="techEmail" name="email" required>
+                        <div class="form-text">The technician will receive an email with a link to access their document upload area.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Access Level</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="access_level" id="accessFull" value="full">
+                            <label class="form-check-label" for="accessFull">
+                                <strong>Full Access</strong> - Can access entire system including equipment management
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="access_level" id="accessDocs" value="documents_only" checked>
+                            <label class="form-check-label" for="accessDocs">
+                                <strong>Documents Only</strong> - Restricted to document upload area only
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane"></i> Send Invite
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle invite form submission
+document.getElementById('inviteTechForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('techEmail').value;
+    const accessLevel = document.querySelector('input[name="access_level"]:checked').value;
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    submitBtn.disabled = true;
+    
+    // Submit form
+    fetch(this.action, {
+        method: 'POST',
+        body: new FormData(this)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('inviteTechModal')).hide();
+            
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle"></i> Invitation sent successfully to ${email}!
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            // Clear form
+            this.reset();
+            document.getElementById('accessDocs').checked = true;
+            
+            // Refresh to show new technician (if they already have an account)
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while sending the invite.');
+    })
+    .finally(() => {
+        // Reset button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
 });
 </script>
 {% endblock %}

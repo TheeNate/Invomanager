@@ -73,7 +73,7 @@ if not initialize_app():
     sys.exit(1)
 
 @app.route('/')
-@auth.require_auth
+@auth.require_full_access
 def index():
     """Main dashboard page"""
     try:
@@ -219,7 +219,7 @@ def auth_logout():
     return redirect(url_for('auth_login'))
 
 @app.route('/equipment/add', methods=['GET', 'POST'])
-@auth.require_auth
+@auth.require_full_access
 def add_equipment():
     """Add new equipment"""
     if request.method == 'POST':
@@ -312,7 +312,7 @@ def add_equipment():
     return render_template('add_equipment.html', equipment_types=equipment_types)
 
 @app.route('/equipment/<path:equipment_id>')
-@auth.require_auth
+@auth.require_full_access
 def equipment_details(equipment_id):
     """Show equipment details"""
     try:
@@ -332,7 +332,7 @@ def equipment_details(equipment_id):
         return redirect(url_for('index'))
 
 @app.route('/equipment/<path:equipment_id>/update_status', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def update_equipment_status(equipment_id):
     """Update equipment status"""
     try:
@@ -356,7 +356,7 @@ def update_equipment_status(equipment_id):
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/equipment/<path:equipment_id>/update_service_date', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def update_equipment_service_date(equipment_id):
     """Update equipment service date"""
     try:
@@ -383,7 +383,7 @@ def update_equipment_service_date(equipment_id):
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/equipment/<path:equipment_id>/update_info', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def update_equipment_info(equipment_id):
     """Update equipment information (name and serial number)"""
     try:
@@ -402,7 +402,7 @@ def update_equipment_info(equipment_id):
         return redirect(url_for('equipment_details', equipment_id=equipment_id))
 
 @app.route('/equipment/<path:equipment_id>/delete', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def delete_equipment(equipment_id):
     """Delete equipment entry"""
     try:
@@ -434,7 +434,7 @@ def delete_equipment(equipment_id):
 
 @app.route('/inspection/add', methods=['GET', 'POST'])
 @app.route('/inspection/add/<path:equipment_id>', methods=['GET', 'POST'])
-@auth.require_auth
+@auth.require_full_access
 def add_inspection(equipment_id=None):
     """Add inspection record"""
     if request.method == 'POST':
@@ -503,7 +503,7 @@ def add_inspection(equipment_id=None):
                          today=date.today().strftime('%Y-%m-%d'))
 
 @app.route('/equipment-types')
-@auth.require_auth
+@auth.require_full_access
 def equipment_types():
     """Manage equipment types"""
     try:
@@ -515,7 +515,7 @@ def equipment_types():
         return render_template('equipment_types.html', equipment_types=[])
 
 @app.route('/equipment-types/add', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def add_equipment_type():
     """Add new equipment type"""
     try:
@@ -555,7 +555,7 @@ def add_equipment_type():
 
 
 @app.route('/api/equipment/<path:equipment_id>')
-@auth.require_auth
+@auth.require_full_access
 def api_equipment_details(equipment_id):
     """API endpoint for equipment details"""
     try:
@@ -664,7 +664,7 @@ def strftime_filter(date_obj, format='%Y-%m-%d'):
         return str(date_obj)
 
 @app.route('/export/pdf/complete')
-@auth.require_auth
+@auth.require_full_access
 def export_complete_inventory_pdf():
     """Export complete inventory as PDF"""
     try:
@@ -690,7 +690,7 @@ def export_complete_inventory_pdf():
         return redirect(url_for('index'))
 
 @app.route('/export/pdf/selected', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def export_selected_equipment_pdf():
     """Export selected equipment as PDF"""
     try:
@@ -727,7 +727,7 @@ def export_selected_equipment_pdf():
         return redirect(url_for('index'))
 
 @app.route('/equipment/bulk_put_in_service', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def bulk_put_in_service():
     """Put multiple equipment items in service"""
     try:
@@ -773,7 +773,7 @@ def bulk_put_in_service():
 
 # Jobs & Billing Routes
 @app.route('/jobs')
-@auth.require_auth
+@auth.require_full_access
 def jobs_dashboard():
     """Jobs & Billing Dashboard"""
     try:
@@ -796,7 +796,7 @@ def jobs_dashboard():
         return redirect(url_for('index'))
 
 @app.route('/jobs/add', methods=['GET', 'POST'])
-@auth.require_auth
+@auth.require_full_access
 def add_job():
     """Add new job"""
     if request.method == 'POST':
@@ -846,7 +846,7 @@ def add_job():
     return render_template('add_job.html')
 
 @app.route('/jobs/<job_id>')
-@auth.require_auth
+@auth.require_full_access
 def job_details(job_id):
     """Job details page"""
     try:
@@ -867,7 +867,7 @@ def job_details(job_id):
         return redirect(url_for('jobs_dashboard'))
 
 @app.route('/jobs/<job_id>/edit', methods=['GET', 'POST'])
-@auth.require_auth
+@auth.require_full_access
 def edit_job(job_id):
     """Edit job details"""
     if request.method == 'POST':
@@ -972,7 +972,7 @@ def edit_job(job_id):
         return redirect(url_for('jobs_dashboard'))
 
 @app.route('/equipment/assign_to_job', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def assign_equipment_to_job():
     """Assign selected equipment to a job"""
     try:
@@ -1005,7 +1005,7 @@ def assign_equipment_to_job():
         return redirect(url_for('index'))
 
 @app.route('/jobs/<job_id>/equipment_pdf')
-@auth.require_auth
+@auth.require_full_access
 def export_job_equipment_pdf(job_id):
     """Export job equipment to PDF"""
     try:
@@ -1047,7 +1047,7 @@ def export_job_equipment_pdf(job_id):
         return redirect(url_for('job_details', job_id=job_id))
 
 @app.route('/jobs/<job_id>/return_equipment', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def return_equipment_from_job(job_id):
     """Return selected equipment from a job"""
     try:
@@ -1075,7 +1075,7 @@ def return_equipment_from_job(job_id):
         return redirect(url_for('job_details', job_id=job_id))
 
 @app.route('/api/active_jobs')
-@auth.require_auth
+@auth.require_full_access
 def api_active_jobs():
     """API endpoint to get active jobs for equipment assignment dropdown"""
     try:
@@ -1087,7 +1087,7 @@ def api_active_jobs():
 # Invoice Management Routes
 
 @app.route('/invoice/create/from_job/<job_id>')
-@auth.require_auth
+@auth.require_full_access
 def create_invoice_from_job(job_id):
     """Create new invoice form from job"""
     try:
@@ -1107,7 +1107,7 @@ def create_invoice_from_job(job_id):
         return redirect(url_for('jobs_dashboard'))
 
 @app.route('/invoice/create/new')
-@auth.require_auth
+@auth.require_full_access
 def create_invoice_new():
     """Create new blank invoice form"""
     try:
@@ -1121,7 +1121,7 @@ def create_invoice_new():
         return redirect(url_for('invoices_list'))
 
 @app.route('/invoice/create/<path:equipment_id>')
-@auth.require_auth
+@auth.require_full_access
 def create_invoice(equipment_id):
     """Create new invoice form"""
     try:
@@ -1146,7 +1146,7 @@ def create_invoice(equipment_id):
         return redirect(url_for('index'))
 
 @app.route('/invoice/save', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def save_invoice():
     """Save invoice with line items"""
     try:
@@ -1208,7 +1208,7 @@ def save_invoice():
         return redirect(url_for('index'))
 
 @app.route('/invoice/<int:invoice_id>')
-@auth.require_auth
+@auth.require_full_access
 def view_invoice(invoice_id):
     """View/print invoice"""
     try:
@@ -1224,7 +1224,7 @@ def view_invoice(invoice_id):
         return redirect(url_for('invoices_list'))
 
 @app.route('/invoice/<int:invoice_id>/pdf')
-@auth.require_auth
+@auth.require_full_access
 def download_invoice_pdf(invoice_id):
     """Download invoice as PDF"""
     try:
@@ -1249,7 +1249,7 @@ def download_invoice_pdf(invoice_id):
         return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/invoices')
-@auth.require_auth
+@auth.require_full_access
 def invoices_list():
     """List all invoices"""
     try:
@@ -1269,7 +1269,7 @@ def invoices_list():
                              today=date.today())
 
 @app.route('/invoice/<int:invoice_id>/status', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def update_invoice_status_route(invoice_id):
     """Update invoice status"""
     try:
@@ -1286,7 +1286,7 @@ def update_invoice_status_route(invoice_id):
         return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/invoice/<int:invoice_id>/delete', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def delete_invoice_route(invoice_id):
     """Delete invoice"""
     try:
@@ -1302,7 +1302,7 @@ def delete_invoice_route(invoice_id):
         return redirect(url_for('invoices_list'))
 
 @app.route('/invoice/<int:invoice_id>/edit')
-@auth.require_auth
+@auth.require_full_access
 def edit_invoice(invoice_id):
     """Edit existing invoice"""
     try:
@@ -1325,7 +1325,7 @@ def edit_invoice(invoice_id):
         return redirect(url_for('invoices_list'))
 
 @app.route('/invoice/<int:invoice_id>/update', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def update_invoice(invoice_id):
     """Update existing invoice"""
     try:
@@ -1404,7 +1404,7 @@ def update_invoice(invoice_id):
         return redirect(url_for('edit_invoice', invoice_id=invoice_id))
 
 @app.route('/job/<job_id>/delete', methods=['POST'])
-@auth.require_auth
+@auth.require_full_access
 def delete_job(job_id):
     """Delete a job after validation checks"""
     try:
@@ -1596,6 +1596,75 @@ def create_bundle():
     except Exception as e:
         flash(f'Error creating bundle: {str(e)}', 'error')
         return redirect(url_for('admin_documents'))
+
+@app.route('/admin/invite-technician', methods=['POST'])
+@auth.require_admin
+def invite_technician():
+    """Invite a new technician via email"""
+    try:
+        email = request.form.get('email', '').strip().lower()
+        access_level = request.form.get('access_level', 'documents_only')
+        
+        if not email:
+            return jsonify({'success': False, 'message': 'Email address is required'})
+        
+        # Validate email format
+        import re
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+            return jsonify({'success': False, 'message': 'Invalid email format'})
+        
+        # Check if email is already in allowed list
+        try:
+            with db_manager.connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM allowed_emails WHERE email = %s", (email,))
+                if cursor.fetchone():
+                    return jsonify({'success': False, 'message': 'This email is already invited'})
+        except Exception as e:
+            print(f"Error checking existing email: {e}")
+            return jsonify({'success': False, 'message': 'Database error occurred'})
+        
+        # Add email to allowed list
+        admin_id = session.get('user_id')
+        if not auth.add_allowed_email(email, admin_id):
+            return jsonify({'success': False, 'message': 'Failed to add email to system'})
+        
+        # Create user entry with restricted access if needed
+        if access_level == 'documents_only':
+            try:
+                db_manager.create_or_update_user(email, role='technician', access_level='documents_only')
+            except Exception as e:
+                print(f"Error creating restricted user: {e}")
+                # Continue anyway, user will be created on first login
+        
+        # Generate and send invitation magic link
+        try:
+            magic_link = auth.generate_magic_link(email, is_invite=True)
+            
+            if auth.send_magic_link(email, magic_link, is_invite=True):
+                return jsonify({
+                    'success': True, 
+                    'message': f'Invitation sent successfully to {email}'
+                })
+            else:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Failed to send invitation email. Please check email service configuration.'
+                })
+                
+        except Exception as e:
+            print(f"Error sending invitation: {e}")
+            return jsonify({
+                'success': False, 
+                'message': 'Failed to generate invitation link'
+            })
+            
+    except Exception as e:
+        print(f"Error in invite_technician: {e}")
+        return jsonify({
+            'success': False, 
+            'message': 'An unexpected error occurred'
+        })
 
 if __name__ == '__main__':
     # Use production mode for deployment
