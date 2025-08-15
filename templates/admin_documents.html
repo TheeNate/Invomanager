@@ -44,8 +44,8 @@
                     <div class="col-md-8">
                         <div class="mb-3">
                             <label for="bundle_name" class="form-label">Bundle Name</label>
-                            <input type="text" class="form-control" id="bundle_name" name="bundle_name" 
-                                   placeholder="Enter bundle name..." value="Document_Package_{{ moment().format('YYYYMMDD') }}">
+                            <input type="text" class="form-control" id="bundle_name_input" name="bundle_name" 
+                                   placeholder="Enter bundle name...">
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -215,5 +215,19 @@ document.getElementById('bundleForm').addEventListener('submit', function(e) {
 
 // Initialize
 updateBundleButton();
+
+// Set default bundle name with current date
+document.addEventListener('DOMContentLoaded', function() {
+    const bundleNameInput = document.getElementById('bundle_name_input');
+    if (bundleNameInput && typeof moment !== 'undefined') {
+        bundleNameInput.value = 'Document_Package_' + moment().format('YYYYMMDD');
+    } else if (bundleNameInput) {
+        const today = new Date();
+        const dateStr = today.getFullYear() + 
+                       String(today.getMonth() + 1).padStart(2, '0') + 
+                       String(today.getDate()).padStart(2, '0');
+        bundleNameInput.value = 'Document_Package_' + dateStr;
+    }
+});
 </script>
 {% endblock %}
