@@ -64,6 +64,61 @@
         </div>
     </div>
 
+    <!-- Admin Document Upload -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-cloud-upload-alt"></i> Admin Document Upload
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <form action="{{ url_for('upload_document', user_id=session.user_id) }}" method="post" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="adminDocument" class="form-label">Select Document</label>
+                                    <input type="file" class="form-control" id="adminDocument" name="document" 
+                                           accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif" required>
+                                    <div class="form-text">Supported: PDF, DOC, DOCX, TXT, JPG, PNG, GIF (max 10MB)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="adminDocType" class="form-label">Document Type</label>
+                                    <select class="form-select" id="adminDocType" name="document_type">
+                                        <option value="policy">Policy/Procedure</option>
+                                        <option value="manual">Manual/Guide</option>
+                                        <option value="certificate">Certificate</option>
+                                        <option value="training">Training Material</option>
+                                        <option value="report">Report</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="form-control btn btn-primary">
+                                        <i class="fas fa-upload"></i> Upload
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2"><i class="fas fa-info-circle"></i> Admin Documents</h6>
+                        <p class="small mb-1">Upload documents that you want to manage centrally as an administrator.</p>
+                        <p class="small mb-0 text-muted">These will appear in your technician list for bundling and management.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Technicians and Documents -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
