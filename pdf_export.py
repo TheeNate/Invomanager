@@ -505,91 +505,259 @@ def generate_invoice_pdf(invoice: Dict) -> io.BytesIO:
 
 
 class DocumentBundler:
-    """PDF bundler for creating document packages"""
+    """PDF bundler for merging actual documents into one PDF"""
     
     def __init__(self):
         self.styles = getSampleStyleSheet()
         
     def create_bundle(self, documents: List[Dict], bundle_name: str) -> str:
-        """Create a PDF bundle with document information"""
+        """Create a PDF bundle by merging actual document files"""
         try:
+            from PyPDF2 import PdfReader, PdfWriter
+            import tempfile
+            import os
+            from PIL import Image
+            
             # Create temp file for bundle
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            # Initialize PDF writer
+            pdf_writer = PdfWriter()
+            
+            # Create cover page first
+            cover_pdf = self._create_cover_page(bundle_name, documents)
+            if cover_pdf:
+                try:
+                    cover_reader = PdfReader(cover_pdf)
+                    for page in cover_reader.pages:
+                        pdf_writer.add_page(page)
+                    os.unlink(cover_pdf)  # Clean up temp cover file
+                except Exception as e:
+                    print(f"Warning: Could not add cover page: {e}")
+            
+            # Process each document
+            processed_count = 0
+            for i, document in enumerate(documents, 1):
+                file_path = document.get('file_path')
+                if not file_path or not os.path.exists(file_path):
+                    print(f"Warning: File not found: {file_path}")
+                    continue
+                
+                try:
+                    # Add document separator page
+                    separator_pdf = self._create_separator_page(i, document)
+                    if separator_pdf:
+                        try:
+                            sep_reader = PdfReader(separator_pdf)
+                            for page in sep_reader.pages:
+                                pdf_writer.add_page(page)
+                            os.unlink(separator_pdf)
+                        except Exception as e:
+                            print(f"Warning: Could not add separator for {document['original_name']}: {e}")
+                    
+                    # Process based on file type
+                    file_ext = os.path.splitext(file_path)[1].lower()
+                    
+                    if file_ext == '.pdf':
+                        # Add PDF pages directly
+                        try:
+                            pdf_reader = PdfReader(file_path)
+                            for page in pdf_reader.pages:
+                                pdf_writer.add_page(page)
+                            processed_count += 1
+                        except Exception as e:
+                            print(f"Error processing PDF {document['original_name']}: {e}")
+                            
+                    elif file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
+                        # Convert image to PDF and add
+                        try:
+                            image_pdf = self._convert_image_to_pdf(file_path)
+                            if image_pdf:
+                                img_reader = PdfReader(image_pdf)
+                                for page in img_reader.pages:
+                                    pdf_writer.add_page(page)
+                                os.unlink(image_pdf)
+                                processed_count += 1
+                        except Exception as e:
+                            print(f"Error processing image {document['original_name']}: {e}")
+                            
+                    elif file_ext in ['.doc', '.docx', '.txt']:
+                        # For text documents, create a PDF with the content
+                        try:
+                            text_pdf = self._convert_text_to_pdf(file_path, document['original_name'])
+                            if text_pdf:
+                                txt_reader = PdfReader(text_pdf)
+                                for page in txt_reader.pages:
+                                    pdf_writer.add_page(page)
+                                os.unlink(text_pdf)
+                                processed_count += 1
+                        except Exception as e:
+                            print(f"Error processing text document {document['original_name']}: {e}")
+                    
+                except Exception as e:
+                    print(f"Error processing document {document['original_name']}: {e}")
+                    continue
+            
+            # Write final PDF
+            with open(temp_path, 'wb') as output_file:
+                pdf_writer.write(output_file)
+            
+            print(f"Successfully created bundle with {processed_count} documents")
+            return temp_path
+            
+        except Exception as e:
+            print(f"Error creating document bundle: {e}")
+            return None
+    
+    def _create_cover_page(self, bundle_name: str, documents: List[Dict]) -> str:
+        """Create a cover page for the bundle"""
+        try:
             import tempfile
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
             temp_path = temp_file.name
             temp_file.close()
             
-            # Create PDF document
             pdf_doc = SimpleDocTemplate(temp_path, pagesize=letter)
             story = []
             
             # Title
-            title = Paragraph(f"<b>Document Bundle: {bundle_name}</b>", self.styles['Title'])
+            title = Paragraph(f"<b>Document Bundle</b>", self.styles['Title'])
             story.append(title)
-            story.append(Spacer(1, 0.3*inch))
-            
-            # Generated date
-            date_text = f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
-            story.append(Paragraph(date_text, self.styles['Normal']))
             story.append(Spacer(1, 0.2*inch))
             
-            # Document count
-            count_text = f"Total Documents: {len(documents)}"
-            story.append(Paragraph(f"<b>{count_text}</b>", self.styles['Heading2']))
+            # Bundle name
+            bundle_title = Paragraph(f"<b>{bundle_name}</b>", self.styles['Heading1'])
+            story.append(bundle_title)
             story.append(Spacer(1, 0.3*inch))
             
-            # Table header
-            table_data = [['#', 'Document Name', 'Type', 'User', 'Upload Date', 'Size']]
+            # Generated info
+            date_text = f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+            story.append(Paragraph(date_text, self.styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
             
-            # Add documents to table
-            for i, document in enumerate(documents, 1):
-                upload_date = document['uploaded_at'].strftime('%m/%d/%Y') if document['uploaded_at'] else 'N/A'
-                file_size = f"{document['file_size'] / 1024:.1f} KB" if document['file_size'] else 'N/A'
-                user_name = document.get('user_name', 'Unknown')
-                doc_type = document.get('document_type', 'other').title()
-                
-                table_data.append([
-                    str(i),
-                    document['original_name'],
-                    doc_type,
-                    user_name,
-                    upload_date,
-                    file_size
-                ])
+            count_text = f"Total Documents: {len(documents)}"
+            story.append(Paragraph(f"<b>{count_text}</b>", self.styles['Heading2']))
+            story.append(Spacer(1, 0.4*inch))
             
-            # Create and style table
-            table = Table(table_data, colWidths=[0.5*inch, 2.5*inch, 1*inch, 1.5*inch, 1*inch, 0.8*inch])
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#3498db')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), HexColor('#ecf0f1')),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -1), 1, HexColor('#bdc3c7')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [HexColor('#ecf0f1'), white]),
-            ]))
+            # Document list
+            story.append(Paragraph("<b>Contents:</b>", self.styles['Heading3']))
+            story.append(Spacer(1, 0.2*inch))
             
-            story.append(table)
+            for i, doc in enumerate(documents, 1):
+                user_name = doc.get('user_name', 'Unknown User')
+                doc_text = f"{i}. {doc['original_name']} ({user_name})"
+                story.append(Paragraph(doc_text, self.styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            pdf_doc.build(story)
+            return temp_path
+            
+        except Exception as e:
+            print(f"Error creating cover page: {e}")
+            return None
+    
+    def _create_separator_page(self, doc_number: int, document: Dict) -> str:
+        """Create a separator page between documents"""
+        try:
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            pdf_doc = SimpleDocTemplate(temp_path, pagesize=letter)
+            story = []
+            
+            # Document header
+            story.append(Spacer(1, 2*inch))
+            
+            header_text = f"<b>Document {doc_number}</b>"
+            story.append(Paragraph(header_text, self.styles['Title']))
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Document details
+            details = f"""
+            <b>File Name:</b> {document['original_name']}<br/>
+            <b>Type:</b> {document.get('document_type', 'other').title()}<br/>
+            <b>User:</b> {document.get('user_name', 'Unknown User')}<br/>
+            <b>Upload Date:</b> {document['uploaded_at'].strftime('%B %d, %Y') if document['uploaded_at'] else 'Unknown'}
+            """
+            
+            story.append(Paragraph(details, self.styles['Normal']))
             story.append(Spacer(1, 0.5*inch))
             
-            # Summary
-            summary_text = f"""
-            <b>Bundle Summary:</b><br/>
-            Total Documents: {len(documents)}<br/>
-            Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}<br/>
-            Bundle Name: {bundle_name}
-            """
-            story.append(Paragraph(summary_text, self.styles['Normal']))
+            # Separator line
+            story.append(Paragraph("_" * 80, self.styles['Normal']))
             
-            # Build PDF
             pdf_doc.build(story)
+            return temp_path
+            
+        except Exception as e:
+            print(f"Error creating separator page: {e}")
+            return None
+    
+    def _convert_image_to_pdf(self, image_path: str) -> str:
+        """Convert an image file to PDF"""
+        try:
+            from PIL import Image
+            import tempfile
+            
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            # Open and convert image
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Save as PDF
+                img.save(temp_path, 'PDF', resolution=100.0)
             
             return temp_path
             
         except Exception as e:
-            print(f"Error creating bundle: {e}")
+            print(f"Error converting image to PDF: {e}")
+            return None
+    
+    def _convert_text_to_pdf(self, text_path: str, filename: str) -> str:
+        """Convert a text file to PDF"""
+        try:
+            import tempfile
+            
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            pdf_doc = SimpleDocTemplate(temp_path, pagesize=letter)
+            story = []
+            
+            # Add filename as header
+            story.append(Paragraph(f"<b>{filename}</b>", self.styles['Heading2']))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Read text content
+            try:
+                with open(text_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                # Try with different encoding
+                with open(text_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+            
+            # Split content into paragraphs
+            paragraphs = content.split('\n')
+            
+            for para in paragraphs:
+                if para.strip():
+                    story.append(Paragraph(para, self.styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            pdf_doc.build(story)
+            return temp_path
+            
+        except Exception as e:
+            print(f"Error converting text to PDF: {e}")
             return None
