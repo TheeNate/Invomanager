@@ -1435,6 +1435,33 @@ def admin_documents():
         flash(f'Error loading document dashboard: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+@app.route('/api/user/<int:user_id>/documents')
+@auth.require_admin
+def api_user_documents(user_id):
+    """API endpoint to get user documents for AJAX loading"""
+    try:
+        documents = db_manager.get_user_documents(user_id)
+        user = db_manager.get_user_by_id(user_id)
+        
+        # Format documents for frontend
+        formatted_docs = []
+        for doc in documents:
+            formatted_docs.append({
+                'id': doc['id'],
+                'original_name': doc['original_name'],
+                'document_type': doc['document_type'],
+                'file_size': doc['file_size'],
+                'uploaded_at': doc['uploaded_at'].strftime('%m/%d/%Y') if doc['uploaded_at'] else 'N/A'
+            })
+        
+        return {
+            'status': 'success',
+            'documents': formatted_docs,
+            'user_name': user['name'] or user['email'] if user else 'Unknown'
+        }
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
 @app.route('/documents/user/<int:user_id>')
 @auth.require_user_or_admin
 def user_documents(user_id):

@@ -145,6 +145,13 @@
                             <span class="badge bg-secondary ms-2">{{ technician.document_count }} docs</span>
                         </h6>
                         <div>
+                            {% if technician.document_count > 0 %}
+                                <button class="btn btn-sm btn-outline-info me-2" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#docs-{{ technician.id }}" 
+                                        aria-expanded="false">
+                                    <i class="fas fa-chevron-down"></i> Expand Documents
+                                </button>
+                            {% endif %}
                             <a href="{{ url_for('user_documents', user_id=technician.id) }}" 
                                class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-folder-open"></i> View Documents
@@ -153,11 +160,28 @@
                     </div>
                     
                     {% if technician.document_count > 0 %}
-                    <div class="documents-preview">
-                        <small class="text-muted">Click "View Documents" to see individual files and select for bundle</small>
+                    <div class="collapse" id="docs-{{ technician.id }}">
+                        <div class="documents-list mt-3 ps-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">Select documents for bundle:</small>
+                                <div>
+                                    <button class="btn btn-xs btn-outline-primary" onclick="selectUserDocs({{ technician.id }}, true)">
+                                        <i class="fas fa-check-square"></i> Select All
+                                    </button>
+                                    <button class="btn btn-xs btn-outline-secondary ms-1" onclick="selectUserDocs({{ technician.id }}, false)">
+                                        <i class="fas fa-square"></i> Select None
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="user-docs-{{ technician.id }}" class="loading-docs">
+                                <div class="text-center p-3">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading documents...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {% else %}
-                    <div class="text-muted">
+                    <div class="text-muted ps-3 mt-2">
                         <small><i class="fas fa-info-circle"></i> No documents uploaded yet</small>
                     </div>
                     {% endif %}
@@ -274,15 +298,101 @@ document.getElementById('bundleForm').addEventListener('submit', function(e) {
     });
 });
 
+// Load documents for a specific user
+function loadUserDocuments(userId) {
+    const container = document.getElementById(`user-docs-${userId}`);
+    
+    fetch(`/api/user/${userId}/documents`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                let html = '';
+                if (data.documents.length === 0) {
+                    html = '<div class="text-muted p-2"><small>No documents uploaded yet</small></div>';
+                } else {
+                    data.documents.forEach(doc => {
+                        const isSelected = selectedDocuments.some(selectedDoc => selectedDoc.id === doc.id);
+                        const sizeStr = doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'Unknown';
+                        
+                        html += `
+                            <div class="form-check border rounded p-2 mb-2 ${isSelected ? 'bg-light' : ''}">
+                                <input class="form-check-input" type="checkbox" id="doc-${doc.id}" 
+                                       ${isSelected ? 'checked' : ''}
+                                       onchange="toggleDocument(${doc.id}, '${doc.original_name.replace(/'/g, "\\'")}', '${data.user_name.replace(/'/g, "\\'")}')">
+                                <label class="form-check-label w-100" for="doc-${doc.id}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>${doc.original_name}</strong><br>
+                                            <small class="text-muted">
+                                                Type: ${doc.document_type.charAt(0).toUpperCase() + doc.document_type.slice(1)} | 
+                                                Size: ${sizeStr} | 
+                                                Uploaded: ${doc.uploaded_at}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        `;
+                    });
+                }
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="text-danger p-2">Error loading documents: ${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = `<div class="text-danger p-2">Error loading documents: ${error.message}</div>`;
+        });
+}
+
+// Handle collapse events to load documents
+document.addEventListener('shown.bs.collapse', function(event) {
+    const collapseId = event.target.id;
+    if (collapseId.startsWith('docs-')) {
+        const userId = collapseId.split('-')[1];
+        loadUserDocuments(userId);
+    }
+});
+
+// Update expand button icon
+document.addEventListener('shown.bs.collapse', function(event) {
+    const button = document.querySelector(`[data-bs-target="#${event.target.id}"]`);
+    if (button) {
+        button.innerHTML = '<i class="fas fa-chevron-up"></i> Collapse Documents';
+    }
+});
+
+document.addEventListener('hidden.bs.collapse', function(event) {
+    const button = document.querySelector(`[data-bs-target="#${event.target.id}"]`);
+    if (button) {
+        button.innerHTML = '<i class="fas fa-chevron-down"></i> Expand Documents';
+    }
+});
+
+// Select/deselect all documents for a user
+function selectUserDocs(userId, selectAll) {
+    const checkboxes = document.querySelectorAll(`#user-docs-${userId} input[type="checkbox"]`);
+    checkboxes.forEach(checkbox => {
+        const docId = parseInt(checkbox.id.split('-')[1]);
+        const isCurrentlySelected = selectedDocuments.some(doc => doc.id === docId);
+        
+        if (selectAll && !isCurrentlySelected) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+        } else if (!selectAll && isCurrentlySelected) {
+            checkbox.checked = false;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
 // Initialize
 updateBundleButton();
 
 // Set default bundle name with current date
 document.addEventListener('DOMContentLoaded', function() {
     const bundleNameInput = document.getElementById('bundle_name_input');
-    if (bundleNameInput && typeof moment !== 'undefined') {
-        bundleNameInput.value = 'Document_Package_' + moment().format('YYYYMMDD');
-    } else if (bundleNameInput) {
+    if (bundleNameInput) {
         const today = new Date();
         const dateStr = today.getFullYear() + 
                        String(today.getMonth() + 1).padStart(2, '0') + 

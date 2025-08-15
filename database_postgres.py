@@ -1513,6 +1513,17 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get a user by their ID"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+        finally:
+            conn.close()
+
     def get_documents_by_ids(self, doc_ids: List[int]) -> List[Dict]:
         """Get documents by their IDs"""
         if not doc_ids:

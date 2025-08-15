@@ -576,22 +576,14 @@ class DocumentBundler:
             story.append(table)
             story.append(Spacer(1, 0.5*inch))
             
-            # Instructions
-            instructions = """
-            <b>Bundle Contents:</b><br/>
-            This bundle contains references to the documents listed above. 
-            Use the document management system to access individual files.<br/><br/>
-            
-            <b>Access Instructions:</b><br/>
-            1. Log into the Equipment Inventory System<br/>
-            2. Navigate to Document Management<br/>
-            3. Search for documents by user or type<br/>
-            4. Download individual documents as needed<br/><br/>
-            
-            For questions about document access, contact your system administrator.
+            # Summary
+            summary_text = f"""
+            <b>Bundle Summary:</b><br/>
+            Total Documents: {len(documents)}<br/>
+            Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}<br/>
+            Bundle Name: {bundle_name}
             """
-            
-            story.append(Paragraph(instructions, self.styles['Normal']))
+            story.append(Paragraph(summary_text, self.styles['Normal']))
             
             # Build PDF
             doc.build(story)
@@ -599,5 +591,5 @@ class DocumentBundler:
             return temp_path
             
         except Exception as e:
-            print(f"Error creating document bundle: {e}")
+            print(f"Error creating bundle: {e}")
             return None
