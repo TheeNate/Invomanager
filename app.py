@@ -1610,6 +1610,35 @@ def delete_document(doc_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/api/user/<int:user_id>/documents')
+@auth.require_admin
+def api_get_user_documents(user_id):
+    """API endpoint to get documents for a specific user"""
+    try:
+        documents = db_manager.get_user_documents(user_id)
+        user = db_manager.get_user_by_id(user_id)
+        
+        doc_list = []
+        for doc in documents:
+            doc_list.append({
+                'id': doc['id'],
+                'original_name': doc['original_name'],
+                'file_size': doc['file_size'],
+                'uploaded_at': doc['uploaded_at'].strftime('%Y-%m-%d') if doc['uploaded_at'] else 'Unknown',
+                'document_type': doc.get('document_type', 'other')
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'documents': doc_list,
+            'user_name': user['name'] if user and user.get('name') else user['email'] if user else 'Unknown User'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
 @app.route('/documents/bundle/create', methods=['POST'])
 @auth.require_admin
 def create_bundle():

@@ -1,0 +1,484 @@
+# Fix Create Bundle Functionality with AJAX Document Loading
+
+## Problem Analysis
+The "Create Bundle" functionality is not working because:
+1. The admin page shows technician lists but no actual documents to select
+2. Document selection happens on individual user pages, separate from the bundle form
+3. The JavaScript `selectedDocuments` array remains empty because there's no selection interface
+4. The bundle form submits without any document IDs
+
+## Solution: Add AJAX Document Loading to Admin Page
+
+### 1. Backend API Routes
+
+#### Add to app.py:
+
+```python
+@app.route('/api/user/<int:user_id>/documents')
+@auth.require_admin
+def api_get_user_documents(user_id):
+    """API endpoint to get documents for a specific user"""
+    try:
+        documents = db_manager.get_user_documents(user_id)
+        user = db_manager.get_user_by_id(user_id)  # You may need to implement this
+        
+        doc_list = []
+        for doc in documents:
+            doc_list.append({
+                'id': doc['id'],
+                'original_name': doc['original_name'],
+                'file_size': doc['file_size'],
+                'uploaded_at': doc['uploaded_at'].strftime('%Y-%m-%d') if doc['uploaded_at'] else 'Unknown',
+                'document_type': doc.get('document_type', 'other')
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'documents': doc_list,
+            'user_name': user['name'] if user and user.get('name') else user['email'] if user else 'Unknown User'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@app.route('/api/admin/all-documents')
+@auth.require_admin
+def api_get_all_documents():
+    """API endpoint to get all documents from all technicians"""
+    try:
+        technicians = db_manager.get_all_technicians()
+        all_documents = []
+        
+        for tech in technicians:
+            documents = db_manager.get_user_documents(tech['id'])
+            for doc in documents:
+                all_documents.append({
+                    'id': doc['id'],
+                    'original_name': doc['original_name'],
+                    'file_size': doc['file_size'],
+                    'uploaded_at': doc['uploaded_at'].strftime('%Y-%m-%d') if doc['uploaded_at'] else 'Unknown',
+                    'document_type': doc.get('document_type', 'other'),
+                    'user_id': tech['id'],
+                    'user_name': tech.get('name') or tech['email']
+                })
+        
+        return jsonify({
+            'status': 'success',
+            'documents': all_documents
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+```
+
+#### Add missing DatabaseManager method if needed:
+
+```python
+def get_user_by_id(self, user_id):
+    """Get user by ID"""
+    try:
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, email, role, access_level, name FROM users WHERE id = %s", 
+                (user_id,)
+            )
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'email': result[1], 
+                    'role': result[2],
+                    'access_level': result[3],
+                    'name': result[4] if len(result) > 4 else None
+                }
+            return None
+    except Exception as e:
+        print(f"Error getting user by ID: {e}")
+        return None
+```
+
+### 2. Frontend Updates
+
+#### Replace the entire Technicians & Documents section in templates/admin_documents.html:
+
+```html
+<!-- Technicians and Documents -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Technicians & Documents</h5>
+        <div>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadAllDocuments()">Load All Documents</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="selectAll()">Select All</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="selectNone()">Select None</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Technician Tabs -->
+        <ul class="nav nav-tabs" id="technicianTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="all-docs-tab" data-bs-toggle="tab" data-bs-target="#all-docs" 
+                        type="button" role="tab" onclick="loadAllDocuments()">
+                    All Documents
+                </button>
+            </li>
+            {% for technician in technicians %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tech-{{ technician.id }}-tab" data-bs-toggle="tab" 
+                        data-bs-target="#tech-{{ technician.id }}" type="button" role="tab" 
+                        onclick="loadUserDocuments({{ technician.id }})">
+                    {{ technician.name or technician.email }}
+                    <span class="badge bg-secondary ms-1">{{ technician.document_count }}</span>
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content mt-3" id="technicianTabsContent">
+            <!-- All Documents Tab -->
+            <div class="tab-pane fade show active" id="all-docs" role="tabpanel">
+                <div id="all-documents-container">
+                    <div class="text-center py-4">
+                        <button class="btn btn-primary" onclick="loadAllDocuments()">
+                            <i class="fas fa-sync"></i> Load All Documents
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual Technician Tabs -->
+            {% for technician in technicians %}
+            <div class="tab-pane fade" id="tech-{{ technician.id }}" role="tabpanel">
+                <div id="user-docs-{{ technician.id }}">
+                    <div class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin"></i> Loading documents...
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+```
+
+#### Update the JavaScript section at the bottom of admin_documents.html:
+
+```javascript
+<script>
+let selectedDocuments = [];
+let loadedDocuments = {}; // Cache loaded documents
+
+function loadAllDocuments() {
+    const container = document.getElementById('all-documents-container');
+    container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Loading all documents...</div>';
+    
+    fetch('/api/admin/all-documents')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                loadedDocuments['all'] = data.documents;
+                displayDocuments(data.documents, 'all-documents-container');
+            } else {
+                container.innerHTML = '<div class="alert alert-danger">Error loading documents: ' + data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            container.innerHTML = '<div class="alert alert-danger">Error loading documents</div>';
+        });
+}
+
+function loadUserDocuments(userId) {
+    const container = document.getElementById(`user-docs-${userId}`);
+    
+    if (loadedDocuments[userId]) {
+        // Already loaded, just display
+        displayDocuments(loadedDocuments[userId], `user-docs-${userId}`);
+        return;
+    }
+    
+    container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Loading documents...</div>';
+    
+    fetch(`/api/user/${userId}/documents`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                loadedDocuments[userId] = data.documents.map(doc => ({
+                    ...doc,
+                    user_name: data.user_name,
+                    user_id: userId
+                }));
+                displayDocuments(loadedDocuments[userId], `user-docs-${userId}`);
+            } else {
+                container.innerHTML = '<div class="alert alert-danger">Error loading documents: ' + data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            container.innerHTML = '<div class="alert alert-danger">Error loading documents</div>';
+        });
+}
+
+function displayDocuments(documents, containerId) {
+    const container = document.getElementById(containerId);
+    
+    if (documents.length === 0) {
+        container.innerHTML = '<div class="text-center py-4"><i class="fas fa-file-alt fa-3x text-muted mb-3"></i><h5>No Documents Found</h5></div>';
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
+    html += '<th width="50"><input type="checkbox" id="selectAll-' + containerId + '" onchange="toggleAllInContainer(\'' + containerId + '\')"></th>';
+    html += '<th>Document Name</th><th>Type</th><th>User</th><th>Upload Date</th><th>Size</th></tr></thead><tbody>';
+    
+    documents.forEach(doc => {
+        const isSelected = selectedDocuments.some(selectedDoc => selectedDoc.id === doc.id);
+        const sizeStr = doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'Unknown';
+        const userName = doc.user_name || 'Unknown User';
+        
+        html += `
+            <tr class="${isSelected ? 'table-light' : ''}">
+                <td>
+                    <input type="checkbox" class="doc-checkbox" 
+                           value="${doc.id}" 
+                           data-name="${doc.original_name}" 
+                           data-user="${userName}"
+                           data-container="${containerId}"
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleDocumentSelection(this)">
+                </td>
+                <td><strong>${doc.original_name}</strong></td>
+                <td><span class="badge bg-info">${doc.document_type || 'other'}</span></td>
+                <td>${userName}</td>
+                <td>${doc.uploaded_at}</td>
+                <td>${sizeStr}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+    
+    updateBundleButton();
+}
+
+function toggleDocumentSelection(checkbox) {
+    const docId = parseInt(checkbox.value);
+    const docName = checkbox.dataset.name;
+    const userName = checkbox.dataset.user;
+    
+    if (checkbox.checked) {
+        // Add to selection if not already there
+        if (!selectedDocuments.some(doc => doc.id === docId)) {
+            selectedDocuments.push({id: docId, name: docName, user: userName});
+        }
+    } else {
+        // Remove from selection
+        selectedDocuments = selectedDocuments.filter(doc => doc.id !== docId);
+    }
+    
+    updateSelectedDocuments();
+    updateBundleButton();
+    updateSelectAllCheckboxes();
+}
+
+function toggleAllInContainer(containerId) {
+    const selectAllCheckbox = document.getElementById('selectAll-' + containerId);
+    const checkboxes = document.querySelectorAll(`#${containerId} .doc-checkbox`);
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+        toggleDocumentSelection(checkbox);
+    });
+}
+
+function selectAll() {
+    // Select all documents across all loaded containers
+    document.querySelectorAll('.doc-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+        toggleDocumentSelection(checkbox);
+    });
+}
+
+function selectNone() {
+    selectedDocuments = [];
+    document.querySelectorAll('.doc-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('[id^="selectAll-"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateSelectedDocuments();
+    updateBundleButton();
+}
+
+function updateSelectAllCheckboxes() {
+    // Update "select all" checkboxes based on current selections
+    document.querySelectorAll('[id^="selectAll-"]').forEach(selectAllCheckbox => {
+        const containerId = selectAllCheckbox.id.replace('selectAll-', '');
+        const containerCheckboxes = document.querySelectorAll(`#${containerId} .doc-checkbox`);
+        const checkedBoxes = document.querySelectorAll(`#${containerId} .doc-checkbox:checked`);
+        
+        selectAllCheckbox.checked = containerCheckboxes.length > 0 && containerCheckboxes.length === checkedBoxes.length;
+        selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < containerCheckboxes.length;
+    });
+}
+
+function updateSelectedDocuments() {
+    const container = document.getElementById('selectedDocuments');
+    const list = document.getElementById('selectedDocsList');
+    
+    if (selectedDocuments.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let html = '<div class="row">';
+    selectedDocuments.forEach(doc => {
+        html += `
+            <div class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded">
+                    <div>
+                        <strong>${doc.name}</strong><br>
+                        <small class="text-muted">User: ${doc.user}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeDocumentFromSelection(${doc.id})">
+                        Remove
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    list.innerHTML = html;
+}
+
+function removeDocumentFromSelection(docId) {
+    selectedDocuments = selectedDocuments.filter(doc => doc.id !== docId);
+    
+    // Uncheck corresponding checkboxes
+    document.querySelectorAll(`.doc-checkbox[value="${docId}"]`).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    updateSelectedDocuments();
+    updateBundleButton();
+    updateSelectAllCheckboxes();
+}
+
+function updateBundleButton() {
+    const btn = document.getElementById('createBundleBtn');
+    if (!btn) return;
+    
+    btn.disabled = selectedDocuments.length === 0;
+    btn.innerHTML = selectedDocuments.length > 0 
+        ? `<i class="fas fa-file-pdf"></i> Create Bundle (${selectedDocuments.length} docs)`
+        : '<i class="fas fa-file-pdf"></i> Create Bundle';
+}
+
+// Handle form submission
+document.getElementById('bundleForm').addEventListener('submit', function(e) {
+    if (selectedDocuments.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one document for the bundle.');
+        return;
+    }
+    
+    // Clear any existing hidden inputs
+    this.querySelectorAll('input[name="selected_documents"]').forEach(input => input.remove());
+    
+    // Add hidden inputs for selected documents
+    selectedDocuments.forEach(doc => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_documents';
+        input.value = doc.id;
+        this.appendChild(input);
+    });
+    
+    // Show loading state
+    const btn = document.getElementById('createBundleBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Bundle...';
+    btn.disabled = true;
+});
+
+// Auto-load all documents when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllDocuments();
+});
+</script>
+```
+
+### 3. Fix Route Naming Issue
+
+#### Update the form action in admin_documents.html:
+
+Change this line:
+```html
+<form id="bundleForm" method="POST" action="{{ url_for('create_bundle') }}">
+```
+
+To:
+```html
+<form id="bundleForm" method="POST" action="{{ url_for('create_bundle') }}">
+```
+
+#### And ensure the route in app.py matches:
+
+The route should be:
+```python
+@app.route('/documents/bundle/create', methods=['POST'])
+@auth.require_admin
+def create_bundle():
+    # existing code
+```
+
+### 4. CSS Improvements (Optional)
+
+#### Add to your CSS or in a `<style>` tag:
+
+```css
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.nav-tabs .nav-link .badge {
+    font-size: 0.7em;
+}
+
+.tab-content {
+    border: 1px solid #dee2e6;
+    border-top: none;
+    padding: 1rem;
+    background: white;
+}
+
+#selectedDocuments {
+    border: 2px dashed #28a745;
+    background: #f8fff9;
+}
+```
+
+### 5. Testing Steps
+
+1. Go to admin documents page
+2. Click "Load All Documents" - should show all documents in a table with checkboxes
+3. Click individual technician tabs - should load that user's documents
+4. Select some documents - they should appear in the "Selected Documents" section
+5. Fill in bundle name and click "Create Bundle" - should download a PDF
+
+This implementation provides:
+- ✅ AJAX loading of documents without page navigation
+- ✅ Tabbed interface to view all documents or per-technician
+- ✅ Real-time selection tracking
+- ✅ Proper form submission with selected document IDs
+- ✅ Visual feedback and loading states
+- ✅ Caching to avoid re-loading data

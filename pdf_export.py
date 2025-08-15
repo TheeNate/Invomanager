@@ -520,7 +520,7 @@ class DocumentBundler:
             temp_file.close()
             
             # Create PDF document
-            doc = SimpleDocTemplate(temp_path, pagesize=letter)
+            pdf_doc = SimpleDocTemplate(temp_path, pagesize=letter)
             story = []
             
             # Title
@@ -542,15 +542,15 @@ class DocumentBundler:
             table_data = [['#', 'Document Name', 'Type', 'User', 'Upload Date', 'Size']]
             
             # Add documents to table
-            for i, doc in enumerate(documents, 1):
-                upload_date = doc['uploaded_at'].strftime('%m/%d/%Y') if doc['uploaded_at'] else 'N/A'
-                file_size = f"{doc['file_size'] / 1024:.1f} KB" if doc['file_size'] else 'N/A'
-                user_name = doc.get('user_name', 'Unknown')
-                doc_type = doc.get('document_type', 'other').title()
+            for i, document in enumerate(documents, 1):
+                upload_date = document['uploaded_at'].strftime('%m/%d/%Y') if document['uploaded_at'] else 'N/A'
+                file_size = f"{document['file_size'] / 1024:.1f} KB" if document['file_size'] else 'N/A'
+                user_name = document.get('user_name', 'Unknown')
+                doc_type = document.get('document_type', 'other').title()
                 
                 table_data.append([
                     str(i),
-                    doc['original_name'],
+                    document['original_name'],
                     doc_type,
                     user_name,
                     upload_date,
@@ -586,7 +586,7 @@ class DocumentBundler:
             story.append(Paragraph(summary_text, self.styles['Normal']))
             
             # Build PDF
-            doc.build(story)
+            pdf_doc.build(story)
             
             return temp_path
             
