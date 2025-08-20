@@ -16,9 +16,17 @@
                     <button type="button" class="btn btn-primary" onclick="window.print()">
                         <i class="bi bi-printer"></i> Print
                     </button>
-                    <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.invoice_id) }}" class="btn btn-success">
-                        <i class="bi bi-download"></i> Download PDF
+                    {% if invoice.status == 'PAID' %}
+                    <!-- For paid invoices, show receipt download -->
+                    <a href="{{ url_for('download_receipt_pdf', invoice_id=invoice.invoice_id) }}" class="btn btn-success">
+                        <i class="bi bi-receipt"></i> Download Receipt
                     </a>
+                    {% else %}
+                    <!-- For non-paid invoices, show regular download -->
+                    <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.invoice_id) }}" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download Invoice
+                    </a>
+                    {% endif %}
                     {% if invoice.status in ['DRAFT', 'SENT'] %}
                     <div class="btn-group">
                         <button type="button" class="btn btn-warning dropdown-toggle" data-bs-toggle="dropdown">

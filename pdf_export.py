@@ -335,6 +335,191 @@ class EquipmentPDFExporter:
         
         return f"{date_str} ({result})"
 
+def generate_receipt_pdf(invoice: Dict) -> io.BytesIO:
+    """Generate PDF receipt for a paid invoice"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=72
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'ReceiptTitle',
+        parent=styles['Title'],
+        fontSize=24,
+        spaceAfter=20,
+        textColor=HexColor('#28a745'),  # Green for receipt
+        alignment=TA_LEFT
+    )
+    
+    header_style = ParagraphStyle(
+        'ReceiptHeader',
+        parent=styles['Heading3'],
+        fontSize=12,
+        spaceAfter=10,
+        textColor=HexColor('#2c3e50'),
+        alignment=TA_LEFT
+    )
+    
+    # Title
+    story.append(Paragraph("RECEIPT", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Receipt header information
+    header_data = [
+        ["Receipt Number:", invoice.get('invoice_number', 'N/A')],
+        ["Receipt Date:", invoice.get('invoice_date', date.today()).strftime('%B %d, %Y') if invoice.get('invoice_date') else 'N/A'],
+        ["Payment Status:", "PAID"],
+        ["Payment Date:", date.today().strftime('%B %d, %Y')]
+    ]
+    
+    if invoice.get('job_number'):
+        header_data.append(["Job Number:", invoice['job_number']])
+    
+    header_table = Table(header_data, colWidths=[1.5*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 20))
+    
+    # Billing information section
+    bill_to_text = "Bill To:\n"
+    if invoice.get('issued_to_name'):
+        bill_to_text += f"{invoice['issued_to_name']}\n"
+    if invoice.get('issued_to_company'):
+        bill_to_text += f"{invoice['issued_to_company']}\n"
+    if invoice.get('issued_to_address'):
+        bill_to_text += f"{invoice['issued_to_address']}\n"
+    
+    pay_to_text = "Received By:\n"
+    if invoice.get('pay_to_name'):
+        pay_to_text += f"{invoice['pay_to_name']}\n"
+    if invoice.get('pay_to_company'):
+        pay_to_text += f"{invoice['pay_to_company']}\n"
+    if invoice.get('pay_to_address'):
+        pay_to_text += f"{invoice['pay_to_address']}\n"
+    
+    billing_table = Table([[Paragraph(bill_to_text, styles['Normal']), 
+                           Paragraph(pay_to_text, styles['Normal'])]], 
+                          colWidths=[3*inch, 3*inch])
+    billing_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOX', (0, 0), (-1, -1), 1, black),
+        ('GRID', (0, 0), (-1, -1), 1, black),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+    ]))
+    story.append(billing_table)
+    story.append(Spacer(1, 20))
+    
+    # Equipment context (if applicable)
+    if invoice.get('equipment_id'):
+        context_text = f"Equipment Context: {invoice['equipment_id']}"
+        if invoice.get('equipment_name'):
+            context_text += f" - {invoice['equipment_name']}"
+        if invoice.get('equipment_type'):
+            context_text += f" ({invoice['equipment_type']})"
+        
+        story.append(Paragraph(context_text, header_style))
+        story.append(Spacer(1, 12))
+    
+    # Line items table
+    line_items_data = [['Description', 'Unit Price', 'Quantity', 'Total']]
+    
+    for item in invoice.get('line_items', []):
+        line_items_data.append([
+            item.get('description', ''),
+            f"${item.get('unit_price', 0):.2f}",
+            str(item.get('quantity', 0)),
+            f"${item.get('line_total', 0):.2f}"
+        ])
+    
+    line_items_table = Table(line_items_data, colWidths=[3*inch, 1*inch, 1*inch, 1*inch])
+    line_items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#28a745')),  # Green header
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Description left-aligned
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(line_items_table)
+    story.append(Spacer(1, 20))
+    
+    # Totals section
+    totals_data = []
+    totals_data.append(['Subtotal:', f"${invoice.get('subtotal', 0):.2f}"])
+    
+    if invoice.get('tax_rate', 0) > 0:
+        totals_data.append([f"Tax ({invoice.get('tax_rate', 0):.1f}%):", f"${invoice.get('tax_amount', 0):.2f}"])
+    
+    totals_data.append(['Total Paid:', f"${invoice.get('total_amount', 0):.2f}"])
+    
+    totals_table = Table(totals_data, colWidths=[4*inch, 1.5*inch])
+    totals_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),  # Bold total row
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('LINEABOVE', (0, -1), (-1, -1), 2, black),  # Line above total
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BACKGROUND', (0, -1), (-1, -1), HexColor('#d4edda')),  # Light green background for total
+    ]))
+    story.append(totals_table)
+    
+    # Receipt footer with paid stamp
+    story.append(Spacer(1, 30))
+    
+    # PAID stamp
+    paid_text = "<b>PAYMENT RECEIVED</b>"
+    paid_style = ParagraphStyle(
+        'PaidStamp',
+        parent=styles['Normal'],
+        fontSize=16,
+        textColor=HexColor('#28a745'),
+        alignment=TA_CENTER,
+        borderWidth=2,
+        borderColor=HexColor('#28a745'),
+        borderPadding=10
+    )
+    story.append(Paragraph(paid_text, paid_style))
+    story.append(Spacer(1, 20))
+    
+    # Footer
+    footer_text = f"Receipt generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+    story.append(Paragraph(footer_text, ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=HexColor('#7f8c8d'),
+        alignment=TA_CENTER
+    )))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
 def generate_invoice_pdf(invoice: Dict) -> io.BytesIO:
     """Generate PDF for a single invoice"""
     buffer = io.BytesIO()

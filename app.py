@@ -1226,17 +1226,22 @@ def view_invoice(invoice_id):
 @app.route('/invoice/<int:invoice_id>/pdf')
 @auth.require_full_access
 def download_invoice_pdf(invoice_id):
-    """Download invoice as PDF"""
+    """Download invoice as PDF - automatically generates receipt if paid"""
     try:
         invoice = db_manager.get_invoice_by_id(invoice_id)
         if not invoice:
             flash('Invoice not found', 'error')
             return redirect(url_for('invoices_list'))
         
-        from pdf_export import generate_invoice_pdf
-        pdf_buffer = generate_invoice_pdf(invoice)
-        
-        filename = f"Invoice_{invoice['invoice_number']}.pdf"
+        # Check if invoice is paid - if so, generate receipt instead
+        if invoice.get('status') == 'PAID':
+            from pdf_export import generate_receipt_pdf
+            pdf_buffer = generate_receipt_pdf(invoice)
+            filename = f"Receipt_{invoice['invoice_number']}.pdf"
+        else:
+            from pdf_export import generate_invoice_pdf
+            pdf_buffer = generate_invoice_pdf(invoice)
+            filename = f"Invoice_{invoice['invoice_number']}.pdf"
         
         return Response(
             pdf_buffer.getvalue(),
@@ -1246,6 +1251,36 @@ def download_invoice_pdf(invoice_id):
         
     except Exception as e:
         flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
+
+@app.route('/invoice/<int:invoice_id>/receipt')
+@auth.require_full_access
+def download_receipt_pdf(invoice_id):
+    """Download receipt PDF (only for paid invoices)"""
+    try:
+        invoice = db_manager.get_invoice_by_id(invoice_id)
+        if not invoice:
+            flash('Invoice not found', 'error')
+            return redirect(url_for('invoices_list'))
+        
+        # Only allow receipt download for paid invoices
+        if invoice.get('status') != 'PAID':
+            flash('Receipts are only available for paid invoices', 'warning')
+            return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        
+        from pdf_export import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(invoice)
+        
+        filename = f"Receipt_{invoice['invoice_number']}.pdf"
+        
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+        )
+        
+    except Exception as e:
+        flash(f'Error generating receipt: {str(e)}', 'error')
         return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/invoices')
