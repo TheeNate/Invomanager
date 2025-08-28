@@ -113,10 +113,34 @@
                                 </td>
                                 {% endif %}
                                 <td>
-                                    <strong>{{ doc.original_name }}</strong>
-                                    {% if doc.document_type %}
-                                        <br><small class="text-muted">{{ doc.document_type|title }}</small>
-                                    {% endif %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <div id="doc-name-display-{{ doc.id }}" class="document-name-display">
+                                                <strong>{{ doc.original_name }}</strong>
+                                            </div>
+                                            <div id="doc-name-edit-{{ doc.id }}" class="document-name-edit" style="display: none;">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control" id="doc-name-input-{{ doc.id }}" 
+                                                           value="{{ doc.original_name }}" maxlength="255">
+                                                    <button class="btn btn-sm btn-success" onclick="saveDocumentName({{ doc.id }})">
+                                                        <i class="bi bi-check"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-secondary" onclick="cancelEditDocumentName({{ doc.id }})">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {% if doc.document_type %}
+                                                <br><small class="text-muted">{{ doc.document_type|title }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                                onclick="editDocumentName({{ doc.id }})" 
+                                                id="edit-btn-{{ doc.id }}"
+                                                title="Edit document name">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="badge bg-secondary">{{ doc.document_type|title }}</span>
@@ -281,5 +305,117 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 {% endif %}
+
+// Document renaming functions
+function editDocumentName(docId) {
+    const displayElement = document.getElementById(`doc-name-display-${docId}`);
+    const editElement = document.getElementById(`doc-name-edit-${docId}`);
+    const editButton = document.getElementById(`edit-btn-${docId}`);
+    
+    displayElement.style.display = 'none';
+    editElement.style.display = 'block';
+    editButton.style.display = 'none';
+    
+    // Focus on input and select filename part (without extension)
+    const input = document.getElementById(`doc-name-input-${docId}`);
+    input.focus();
+    
+    const filename = input.value;
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex > 0) {
+        input.setSelectionRange(0, lastDotIndex);
+    } else {
+        input.select();
+    }
+}
+
+function cancelEditDocumentName(docId) {
+    const displayElement = document.getElementById(`doc-name-display-${docId}`);
+    const editElement = document.getElementById(`doc-name-edit-${docId}`);
+    const editButton = document.getElementById(`edit-btn-${docId}`);
+    const input = document.getElementById(`doc-name-input-${docId}`);
+    
+    // Reset input to original value
+    const originalName = displayElement.querySelector('strong').textContent;
+    input.value = originalName;
+    
+    displayElement.style.display = 'block';
+    editElement.style.display = 'none';
+    editButton.style.display = 'block';
+}
+
+function saveDocumentName(docId) {
+    const input = document.getElementById(`doc-name-input-${docId}`);
+    const newName = input.value.trim();
+    
+    if (!newName) {
+        alert('Document name cannot be empty');
+        return;
+    }
+    
+    // Show loading state
+    const saveButton = document.querySelector(`#doc-name-edit-${docId} .btn-success`);
+    const originalSaveText = saveButton.innerHTML;
+    saveButton.innerHTML = '<i class="spinner-border spinner-border-sm"></i>';
+    saveButton.disabled = true;
+    
+    fetch(`/api/documents/rename/${docId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            new_name: newName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the display with the new name
+            const displayElement = document.getElementById(`doc-name-display-${docId}`);
+            displayElement.querySelector('strong').textContent = data.new_name;
+            
+            // Show success message briefly
+            const displayDiv = displayElement.parentElement;
+            const successMsg = document.createElement('small');
+            successMsg.className = 'text-success';
+            successMsg.innerHTML = '<i class="bi bi-check-circle"></i> Renamed successfully';
+            displayDiv.appendChild(successMsg);
+            
+            setTimeout(() => {
+                if (successMsg.parentNode) {
+                    successMsg.parentNode.removeChild(successMsg);
+                }
+            }, 3000);
+            
+            cancelEditDocumentName(docId);
+        } else {
+            alert('Error renaming document: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error renaming document: ' + error);
+    })
+    .finally(() => {
+        // Restore button state
+        saveButton.innerHTML = originalSaveText;
+        saveButton.disabled = false;
+    });
+}
+
+// Handle Enter key for saving and Escape key for canceling
+document.addEventListener('keydown', function(event) {
+    if (event.target.matches('[id^="doc-name-input-"]')) {
+        const docId = event.target.id.split('-')[3];
+        
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            saveDocumentName(docId);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelEditDocumentName(docId);
+        }
+    }
+});
 </script>
 {% endblock %}

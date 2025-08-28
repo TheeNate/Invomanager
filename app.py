@@ -1645,6 +1645,65 @@ def delete_document(doc_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/api/documents/rename/<int:doc_id>', methods=['POST'])
+@auth.require_user_or_admin
+def rename_document(doc_id):
+    """Rename a document"""
+    try:
+        # Get JSON payload
+        data = request.get_json()
+        if not data or 'new_name' not in data:
+            return jsonify({'success': False, 'message': 'New name is required'})
+        
+        new_name = data['new_name'].strip()
+        if not new_name:
+            return jsonify({'success': False, 'message': 'Document name cannot be empty'})
+        
+        # Get document info for permission check
+        documents = db_manager.get_documents_by_ids([doc_id])
+        if not documents:
+            return jsonify({'success': False, 'message': 'Document not found'})
+        
+        document = documents[0]
+        user_id = document['user_id']
+        current_name = document['original_name']
+        
+        # Check permissions - technicians can only rename their own documents, admins can rename any
+        if session.get('user_role') != 'admin' and user_id != session.get('user_id'):
+            return jsonify({'success': False, 'message': 'Access denied'})
+        
+        # Preserve file extension
+        import os
+        original_name, original_ext = os.path.splitext(current_name)
+        new_name_base, new_ext = os.path.splitext(new_name)
+        
+        # If no extension provided or different extension, preserve original
+        if not new_ext or new_ext.lower() != original_ext.lower():
+            final_name = new_name_base + original_ext
+        else:
+            final_name = new_name
+        
+        # Sanitize filename to prevent directory traversal
+        from werkzeug.utils import secure_filename
+        sanitized_name = secure_filename(final_name)
+        
+        if not sanitized_name:
+            return jsonify({'success': False, 'message': 'Invalid filename'})
+        
+        # Update database - only update original_name, keep file_path unchanged
+        if db_manager.rename_user_document(doc_id, sanitized_name):
+            return jsonify({
+                'success': True, 
+                'message': 'Document renamed successfully',
+                'new_name': sanitized_name
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to rename document'})
+        
+    except Exception as e:
+        print(f"Error renaming document: {e}")
+        return jsonify({'success': False, 'message': 'Server error occurred'})
+
 @app.route('/api/user/<int:user_id>/documents')
 @auth.require_admin
 def api_get_user_documents(user_id):

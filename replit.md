@@ -16,7 +16,7 @@ The system utilizes a Flask web application with Bootstrap 5 for the UI framewor
 - **Database**: PostgreSQL is used as the primary database, managed through a Data Access Object (DAO) pattern with a centralized DatabaseManager.
 - **Data Models**: Dataclass-based models are used, separating business logic from data representation.
 - **Authentication**: Magic link email-based authentication is implemented with role-based access control. The system features a multi-role security model distinguishing between admin and technician users, with session-based authentication and automatic token expiry. All routes are protected with role-specific permissions.
-- **Document Management System**: Handles document oversight, user-specific document management, secure file uploads (PDF, DOC, DOCX, TXT, JPG, PNG, GIF up to 10MB), document bundling for PDF generation, and role-based access control for documents.
+- **Document Management System**: Handles document oversight, user-specific document management, secure file uploads (PDF, DOC, DOCX, TXT, JPG, PNG, GIF up to 10MB), document bundling for PDF generation, inline document renaming with security validation, and role-based access control for documents.
 - **Core Business Logic**: Includes equipment status enumeration (ACTIVE, RED_TAGGED, DESTROYED), inspection result tracking (PASS, FAIL), and dataclasses for Equipment and EquipmentType with validation logic.
 - **Key Features**:
     - Comprehensive equipment tracking with unique IDs and names.
@@ -27,6 +27,7 @@ The system utilizes a Flask web application with Bootstrap 5 for the UI framewor
     - Invoice generation and management with status tracking (DRAFT, SENT, PAID).
     - Job management with deletion features for non-active jobs.
     - Compliance management with 7-year record retention and audit trails for status changes and inspections.
+    - Document renaming functionality with inline editing, security validation, and extension preservation.
 
 ### System Design Choices
 - **Design Pattern**: Data Access Object (DAO) pattern for database interactions.

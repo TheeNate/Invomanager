@@ -1495,6 +1495,23 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def rename_user_document(self, doc_id: int, new_name: str) -> bool:
+        """Rename a document - updates only the original_name field"""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_documents 
+                SET original_name = %s 
+                WHERE id = %s
+            """, (new_name, doc_id))
+            success = cursor.rowcount > 0
+            if success:
+                conn.commit()
+            return success
+        finally:
+            conn.close()
+
     def get_all_technicians(self) -> List[Dict]:
         """Get all users (both technicians and admins) for document management"""
         conn = self.connect()
