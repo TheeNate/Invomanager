@@ -476,7 +476,9 @@ document.getElementById('inviteTechForm').addEventListener('submit', function(e)
                 <i class="bi bi-check-circle"></i> Invitation sent successfully to ${email}!
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
-            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            // Insert alert above the form
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild); 
             
             // Clear form
             this.reset();
