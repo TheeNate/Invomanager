@@ -1,7 +1,21 @@
 # Equipment Inventory Management System
 
 ## Overview
-This project is a web-based equipment inventory management system specifically designed for safety and climbing equipment. Its core purpose is to provide comprehensive tracking of equipment with unique IDs, manage mandatory inspection cycles, control equipment status, and ensure compliance with safety regulations, including 7-year record retention requirements. The system allows users to manage the complete equipment lifecycle from creation to disposal, maintaining full audit trails. The vision is to streamline equipment management for safety-critical environments, ensuring compliance and enhancing operational efficiency.
+This project is a web-based operations system built for rope access companies. It started as an equipment inventory tracker but has expanded into a broader platform that handles day-to-day business functions.
+
+The system currently includes:
+
+Inventory Management – Track all rope access equipment with unique IDs, inspection cycles, service history, and disposal. Items can be assigned directly to jobs, automatically updating the active inventory list.
+
+Job Management – Create jobs with client details and scope of work, then assign equipment and personnel as needed. Inventory assigned to a job is pulled from active stock for accurate tracking.
+
+Billing & Invoicing – Generate, send, and manage invoices with status tracking (Draft, Sent, Paid).
+
+Inspections – Manage mandatory inspection cycles, record inspection results, and maintain full audit trails.
+
+Documentation – Collect and organize technician documents required by clients. Admins can select technicians and bundle their documents into a single PDF for easy client submission.
+
+What began as a simple equipment tracker has grown into a lightweight business operations platform—streamlining equipment management, job setup, compliance, invoicing, and documentation all in one place.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
